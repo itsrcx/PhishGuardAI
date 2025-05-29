@@ -12,7 +12,7 @@
   <script>
     async function scanURL() {
       const url = document.getElementById("url").value;
-      const response = await fetch("https://your-api-id.execute-api.us-east-1.amazonaws.com/prod/scan", {
+      const response = await fetch("https://429qv9l0ib.execute-api.us-east-1.amazonaws.com/api", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ url: url })

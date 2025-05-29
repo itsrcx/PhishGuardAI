@@ -1,7 +1,7 @@
 import os
 import json
 import boto3
-from datetime import datetime
+from datetime import datetime, timezone
 import uuid
 
 dynamodb = boto3.resource('dynamodb')
@@ -10,7 +10,7 @@ table = dynamodb.Table('PhishScans')
 SNS_TOPIC_ARN = os.getenv('SNS_TOPIC_ARN')
 
 def lambda_handler(event, context):
-    body = json.loads(event['body'])
+    body = json.loads(event.get('body', '{}'))
     url = body.get('url', '')
     
     # Simulated ML model (replace with SageMaker later)
@@ -21,7 +21,11 @@ def lambda_handler(event, context):
         "id": str(uuid.uuid4()),
         "URL": url,
         "RiskLevel": "HIGH" if is_phishing else "LOW",
-        "Timestamp": datetime.utcnow().isoformat()
+        "Timestamp": datetime.now(tz=timezone.utc).isoformat(),
+        "Details": {
+            "is_phishing": is_phishing,
+            "reason": "Contains 'login' or 'secure'" if is_phishing else "No phishing indicators detected"
+        }
     }
 
     table.put_item(Item=result)
@@ -35,6 +39,12 @@ def lambda_handler(event, context):
 
     return {
         'statusCode': 200,
-        'headers': {'Content-Type': 'application/json'},
+        "headers": {
+    
+  },
+        'headers': {
+            'Content-Type': 'application/json',
+            'Access-Control-Allow-Origin': '*'
+        },
         'body': json.dumps(result)
     }

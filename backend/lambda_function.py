@@ -37,25 +37,19 @@ def save_to_dynamodb(item):
 
 
 def send_sns_alert(url):
-    html_message = f"""
-    <html>
-        <head></head>
-        <body>
-            <h2 style="color:red;">⚠️ PhishGuard Alert</h2>
-            <p>A suspicious URL has been detected:</p>
-            <p><strong>{url}</strong></p>
-            <p>Please take immediate action to verify and block if necessary.</p>
-            <hr>
-            <p style="font-size:small;color:gray;">PhishGuard AI Security System</p>
-        </body>
-    </html>
-    """
-    sms_message = f"⚠️ Phishing alert: {url}"
-
     message = {
-        "default": sms_message,
-        "email": html_message,
-        "sms": sms_message
+        "default": f"⚠️ Phishing alert: {url}",
+        "email": f"""
+            ⚠️ PhishGuard Alert
+
+            A suspicious URL has been detected:
+            🔗 {url}
+
+            Please take immediate action to verify and block if necessary.
+
+            – PhishGuard AI Security System
+            """,
+        "sms": f"⚠️ Phishing alert: {url}"
     }
 
     sns.publish(

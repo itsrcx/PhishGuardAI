@@ -6,17 +6,17 @@ import { AuthProvider } from "react-oidc-context";
 const cognitoAuthConfig = {
   authority: "https://cognito-idp.us-east-1.amazonaws.com/us-east-1_K00Q7Ztpo",
   client_id: "6vvh4hcarjstddi3qtbp01ju9m",
-  redirect_uri: "https://frontend.d379cwgs4rdrvf.amplifyapp.com/",
+  redirect_uri: "https://frontend.d2b6jum2293iep.amplifyapp.com/",
   response_type: "code",
-  scope: "email openid phone",
+  response_mode: "fragment",
+  scope: "openid email"
 };
+
 
 const root = ReactDOM.createRoot(document.getElementById("root"));
 
 root.render(
-  <React.StrictMode>
-    <AuthProvider {...cognitoAuthConfig}>
-      <App />
-    </AuthProvider>
-  </React.StrictMode>
+  <AuthProvider {...cognitoAuthConfig}>
+    <App />
+  </AuthProvider>
 );

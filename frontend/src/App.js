@@ -16,14 +16,13 @@ function App() {
     setError(null);
     setResult(null);
     
-    console.log("Sending token:", auth.user?.access_token);
     try {
       const res = await axios.post(
         'https://429qv9l0ib.execute-api.us-east-1.amazonaws.com/api',
         { url },
         {
           headers: {
-            Authorization: `${auth.user?.access_token}`,
+            Authorization: `${auth.user?.id_token}`,
           },
         }
       );
@@ -47,9 +46,6 @@ function App() {
   if (auth.error) return <div>Error: {auth.error.message}</div>;
 
   if (!auth.isAuthenticated) {
-    console.log("User Object:", auth.user);
-    console.log("Access Token:", auth.user?.access_token);
-    console.log("ID Token:", auth.user?.id_token);
     return (
       <div style={{ padding: 30 }}>
         <h1>PhishGuard AI</h1>

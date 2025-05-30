@@ -40,7 +40,8 @@ def send_sns_alert(url):
     message = {
         "default": f"⚠️ Phishing alert: {url}",
         "sms": f"⚠️ Phishing alert: {url}",
-        "email": f"""⚠️ PhishGuard Alert ⚠️
+        "email": f"""
+⚠️ PhishGuard Alert ⚠️
 
 A suspicious URL has been detected:
 🔗 {url}

@@ -17,8 +17,7 @@ def lambda_handler(event, context):
     is_phishing = "login" in url or "secure" in url
 
     result = {
-        # ScanID
-        "id": str(uuid.uuid4()),
+        "ScanID": str(uuid.uuid4()),
         "URL": url,
         "RiskLevel": "HIGH" if is_phishing else "LOW",
         "Timestamp": datetime.now(tz=timezone.utc).isoformat(),

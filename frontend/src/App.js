@@ -4,7 +4,6 @@ import { useAuth } from 'react-oidc-context';
 
 function App() {
   const auth = useAuth();
-
   const [url, setUrl] = useState('');
   const [result, setResult] = useState(null);
   const [error, setError] = useState(null);

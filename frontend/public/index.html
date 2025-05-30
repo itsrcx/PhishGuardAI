@@ -1,25 +1,14 @@
 <!DOCTYPE html>
-<html>
-<head>
-  <title>PhishGuardAI</title>
-</head>
-<body>
-  <h2>Phishing Scanner</h2>
-  <input type="text" id="url" placeholder="Enter URL to scan">
-  <button onclick="scanURL()">Scan</button>
-  <pre id="result"></pre>
-
-  <script>
-    async function scanURL() {
-      const url = document.getElementById("url").value;
-      const response = await fetch("https://429qv9l0ib.execute-api.us-east-1.amazonaws.com/api", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url: url })
-      });
-      const data = await response.json();
-      document.getElementById("result").innerText = JSON.stringify(data, null, 2);
-    }
-  </script>
-</body>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>PhishGuard AI</title>
+    <meta name="description" content="Phishing URL scanner powered by AI and AWS Cognito." />
+    <link rel="icon" href="%PUBLIC_URL%/favicon.ico" />
+  </head>
+  <body>
+    <noscript>You need to enable JavaScript to run this app.</noscript>
+    <div id="root"></div>
+  </body>
 </html>

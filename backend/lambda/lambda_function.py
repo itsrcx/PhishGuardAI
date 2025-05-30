@@ -39,17 +39,16 @@ def save_to_dynamodb(item):
 def send_sns_alert(url):
     message = {
         "default": f"⚠️ Phishing alert: {url}",
-        "email": f"""
-            ⚠️ PhishGuard Alert
+        "sms": f"⚠️ Phishing alert: {url}",
+        "email": f"""⚠️ PhishGuard Alert ⚠️
 
-            A suspicious URL has been detected:
-            🔗 {url}
+A suspicious URL has been detected:
+🔗 {url}
 
-            Please take immediate action to verify and block if necessary.
+Please take immediate action to verify and block if necessary.
 
-            – PhishGuard AI Security System
-            """,
-        "sms": f"⚠️ Phishing alert: {url}"
+🛡️ PhishGuard AI Security System 🛡️
+"""
     }
 
     sns.publish(

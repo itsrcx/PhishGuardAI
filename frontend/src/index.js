@@ -8,16 +8,15 @@ const cognitoAuthConfig = {
   client_id: "6vvh4hcarjstddi3qtbp01ju9m",
   redirect_uri: "https://frontend.d2b6jum2293iep.amplifyapp.com/",
   response_type: "code",
-  response_mode: "fragment",
-  scope: "openid email"
+  scope: "email openid",
 };
-
 
 const root = ReactDOM.createRoot(document.getElementById("root"));
 
 root.render(
-  <AuthProvider {...cognitoAuthConfig}>
-    <App />
-  </AuthProvider>
+  <React.StrictMode>
+    <AuthProvider {...cognitoAuthConfig}>
+      <App />
+    </AuthProvider>
+  </React.StrictMode>
 );
-

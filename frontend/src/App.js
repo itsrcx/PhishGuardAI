@@ -34,7 +34,7 @@ function App() {
     setSubscribeError(null);
     setSubscribing(true);
     try {
-      const token = auth.user?.access_token; // Use access_token for API authorization
+      const token = auth.user?.id_token; // Use access_token for API authorization
 
       if (!token) {
         throw new Error("Authentication token not found. Please sign in again.");

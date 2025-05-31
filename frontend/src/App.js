@@ -26,7 +26,7 @@ function App() {
   const LOGOUT_URI = "https://frontend.d2b6jum2293iep.amplifyapp.com/";
 
   // Base URL for your API Gateway endpoint
-  const API_BASE_URL = 'https://429qv9l0ib.execute-api.us-east-1.amazonaws.com';
+  const API_BASE_URL = 'https://429qv9l0ib.execute-api.us-east-1.amazonaws.com/api';
 
   // Helper function to handle API calls consistently
   const makeApiCall = async (path, data) => {

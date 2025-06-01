@@ -37,13 +37,16 @@ function App() {
     setOperationLoading(true); // Set the specific operation's loading state
     try {
       const token = auth.user?.id_token; // Use access_token for API authorization
+      console.log("Auth User:", auth.user);
+      console.log("ID Token Claims:", auth.user?.id_token_claims);
+      console.log("Profile:", auth.user?.profile);
 
       if (!token) {
         throw new Error("Authentication token not found. Please sign in again.");
       }
 
       const res = await axios.post(
-        `<span class="math-inline">\{API\_BASE\_URL\}</span>{path}`,
+        `${API_BASE_URL}${path}`,
         data,
         {
           headers: {
@@ -227,7 +230,7 @@ function App() {
                   !email || subscribingEmail ? 'bg-gray-400 cursor-not-allowed text-gray-600' : 'bg-blue-600 hover:bg-blue-700 text-white shadow-md'
                 }`}
               >
-                {subscribingEmail ? 'Subscribing...' : 'Subscribe Email'} // Use subscribingEmail
+                {subscribingEmail ? 'Subscribing...' : 'Subscribe Email'}
               </button>
             </div>
           </div>
@@ -251,7 +254,7 @@ function App() {
                   !phoneNumber || subscribingSms ? 'bg-gray-400 cursor-not-allowed text-gray-600' : 'bg-blue-600 hover:bg-blue-700 text-white shadow-md'
                 }`}
               >
-                {subscribingSms ? 'Subscribing...' : 'Subscribe SMS'} // Use subscribingSms
+                {subscribingSms ? 'Subscribing...' : 'Subscribe SMS'}
               </button>
             </div>
           </div>

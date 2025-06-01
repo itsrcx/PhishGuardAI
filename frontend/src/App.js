@@ -22,9 +22,9 @@ function App() {
   const [subscribingSms, setSubscribingSms] = useState(false);
 
   // Define constants for Cognito configuration (was used in logout redirect).
-  // const CLIENT_ID = "6vvh4hcarjstddi3qtbp01ju9m";
-  // const COGNITO_DOMAIN = "https://us-east-1k00q7ztpo.auth.us-east-1.amazoncognito.com";
-  // const LOGOUT_URI = "https://frontend.d2b6jum2293iep.amplifyapp.com/";
+  const CLIENT_ID = "6vvh4hcarjstddi3qtbp01ju9m";
+  const COGNITO_DOMAIN = "https://us-east-1k00q7ztpo.auth.us-east-1.amazoncognito.com";
+  const LOGOUT_URI = "https://frontend.d2b6jum2293iep.amplifyapp.com/";
 
   // Base URL for your API Gateway endpoint
   const API_BASE_URL = 'https://429qv9l0ib.execute-api.us-east-1.amazonaws.com/api';
@@ -37,9 +37,6 @@ function App() {
     setOperationLoading(true); // Set the specific operation's loading state
     try {
       const token = auth.user?.id_token; // Use access_token for API authorization
-      console.log("Auth User:", auth.user);
-      console.log("ID Token Claims:", auth.user?.id_token_claims);
-      console.log("Profile:", auth.user?.profile);
 
       if (!token) {
         throw new Error("Authentication token not found. Please sign in again.");
@@ -122,9 +119,9 @@ function App() {
   };
 
   // Function to redirect to Cognito for a full sign-out
-  // const signOutRedirect = () => {
-  //   window.location.href = `${COGNITO_DOMAIN}/logout?client_id=${CLIENT_ID}&logout_uri=${encodeURIComponent(LOGOUT_URI)}`;
-  // };
+  const signOutRedirect = () => {
+    window.location.href = `${COGNITO_DOMAIN}/logout?client_id=${CLIENT_ID}&logout_uri=${encodeURIComponent(LOGOUT_URI)}`;
+  };
 
   // Display loading state while authentication is in progress
   if (auth.isLoading) {
@@ -168,7 +165,7 @@ function App() {
       <div className="bg-white p-8 rounded-lg shadow-md w-full max-w-md mt-10">
         <h1 className="text-3xl font-bold mb-4 text-gray-800 text-center">PhishGuard AI</h1>
         <p className="text-gray-600 mb-6 text-center">
-          Welcome, <span className="font-semibold text-blue-700">{auth.user?.profile.name || auth.user?.id_token_claims?.['cognito:username'] || auth.user?.profile.username || auth.user?.profile.email || 'User'}</span>!
+          Welcome, <span className="font-semibold text-blue-700">{auth.user?.profile.name || auth.user?.profile?.['cognito:username'] || auth.user?.profile.email || 'User'}</span>!
         </p>
 
         {/* URL Scan Section */}

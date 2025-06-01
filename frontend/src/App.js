@@ -163,7 +163,7 @@ function App() {
       <div className="bg-white p-8 rounded-lg shadow-md w-full max-w-md mt-10">
         <h1 className="text-3xl font-bold mb-4 text-gray-800 text-center">PhishGuard AI</h1>
         <p className="text-gray-600 mb-6 text-center">
-          Welcome, <span className="font-semibold text-blue-700">{auth.user?.profile.email || 'User'}</span>!
+          Welcome, <span className="font-semibold text-blue-700">{auth.user?.profile.preferred_username || auth.user?.profile.username || auth.user?.profile.email || 'User'}</span>!
         </p>
 
         {/* URL Scan Section */}

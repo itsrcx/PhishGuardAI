@@ -117,9 +117,9 @@ function App() {
   };
 
   // Function to redirect to Cognito for a full sign-out
-  const signOutRedirect = () => {
-    window.location.href = `${COGNITO_DOMAIN}/logout?client_id=${CLIENT_ID}&logout_uri=${encodeURIComponent(LOGOUT_URI)}`;
-  };
+  // const signOutRedirect = () => {
+  //   window.location.href = `${COGNITO_DOMAIN}/logout?client_id=${CLIENT_ID}&logout_uri=${encodeURIComponent(LOGOUT_URI)}`;
+  // };
 
   // Display loading state while authentication is in progress
   if (auth.isLoading) {
@@ -266,19 +266,13 @@ function App() {
           )}
         </div>
 
-        {/* Sign Out Buttons */}
+        {/* Sign Out Button */}
         <div className="flex flex-col sm:flex-row justify-center gap-4">
           <button
             onClick={() => auth.removeUser()}
             className="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-md shadow-md transition duration-300 ease-in-out flex-1"
           >
-            Sign out (Local)
-          </button>
-          <button
-            onClick={signOutRedirect}
-            className="bg-red-700 hover:bg-red-800 text-white font-bold py-2 px-4 rounded-md shadow-md transition duration-300 ease-in-out flex-1"
-          >
-            Sign out (Cognito)
+            Sign out
           </button>
         </div>
       </div>

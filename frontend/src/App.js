@@ -18,21 +18,23 @@ function App() {
   const [phoneNumber, setPhoneNumber] = useState('');
   const [subscribeMessage, setSubscribeMessage] = useState(null);
   const [subscribeError, setSubscribeError] = useState(null);
-  const [subscribing, setSubscribing] = useState(false);
+  const [subscribingEmail, setSubscribingEmail] = useState(false);
+  const [subscribingSms, setSubscribingSms] = useState(false);
 
-  // Define constants for Cognito configuration.
-  const CLIENT_ID = "6vvh4hcarjstddi3qtbp01ju9m";
-  const COGNITO_DOMAIN = "https://us-east-1k00q7ztpo.auth.us-east-1.amazoncognito.com";
-  const LOGOUT_URI = "https://frontend.d2b6jum2293iep.amplifyapp.com/";
+  // Define constants for Cognito configuration (was used in logout redirect).
+  // const CLIENT_ID = "6vvh4hcarjstddi3qtbp01ju9m";
+  // const COGNITO_DOMAIN = "https://us-east-1k00q7ztpo.auth.us-east-1.amazoncognito.com";
+  // const LOGOUT_URI = "https://frontend.d2b6jum2293iep.amplifyapp.com/";
 
   // Base URL for your API Gateway endpoint
   const API_BASE_URL = 'https://429qv9l0ib.execute-api.us-east-1.amazonaws.com/api';
 
   // Helper function to handle API calls consistently
-  const makeApiCall = async (path, data) => {
+  // It now accepts a state setter for the specific operation's loading state
+  const makeApiCall = async (path, data, setOperationLoading) => {
     setSubscribeMessage(null);
     setSubscribeError(null);
-    setSubscribing(true);
+    setOperationLoading(true); // Set the specific operation's loading state
     try {
       const token = auth.user?.id_token; // Use access_token for API authorization
 
@@ -41,7 +43,7 @@ function App() {
       }
 
       const res = await axios.post(
-        `${API_BASE_URL}${path}`,
+        `<span class="math-inline">\{API\_BASE\_URL\}</span>{path}`,
         data,
         {
           headers: {
@@ -63,7 +65,7 @@ function App() {
       }
       throw err; // Re-throw to be caught by specific handlers if needed
     } finally {
-      setSubscribing(false);
+      setOperationLoading(false); // Clear the specific operation's loading state
     }
   };
 
@@ -71,18 +73,18 @@ function App() {
   const scanUrl = async () => {
     if (!url) return;
 
-    setLoading(true);
+    setLoading(true); // Keep this specific loading state for scan
     setError(null);
     setResult(null);
 
     try {
-      // API Gateway path for scanning is now '/scan'
-      const data = await makeApiCall('/scan', { url });
+      // Pass setLoading to makeApiCall for the scan operation
+      const data = await makeApiCall('/scan', { url }, setLoading);
       setResult(data);
     } catch (err) {
       // Error is already set by makeApiCall, no need to duplicate
     } finally {
-      setLoading(false);
+      setLoading(false); // This will be set by makeApiCall now, but keeping for clarity
     }
   };
 
@@ -93,8 +95,8 @@ function App() {
       return;
     }
     try {
-      // API Gateway path for email subscription is '/subscribe/email'
-      await makeApiCall('/subscribe/email', { email });
+      // Pass setSubscribingEmail to makeApiCall for the email subscription operation
+      await makeApiCall('/subscribe/email', { email }, setSubscribingEmail);
       setEmail(''); // Clear input on success
     } catch (err) {
       // Error is already set by makeApiCall
@@ -108,8 +110,8 @@ function App() {
       return;
     }
     try {
-      // API Gateway path for SMS subscription is '/subscribe/sms'
-      await makeApiCall('/subscribe/sms', { phoneNumber });
+      // Pass setSubscribingSms to makeApiCall for the SMS subscription operation
+      await makeApiCall('/subscribe/sms', { phoneNumber }, setSubscribingSms);
       setPhoneNumber(''); // Clear input on success
     } catch (err) {
       // Error is already set by makeApiCall
@@ -163,7 +165,7 @@ function App() {
       <div className="bg-white p-8 rounded-lg shadow-md w-full max-w-md mt-10">
         <h1 className="text-3xl font-bold mb-4 text-gray-800 text-center">PhishGuard AI</h1>
         <p className="text-gray-600 mb-6 text-center">
-          Welcome, <span className="font-semibold text-blue-700">{auth.user?.profile.preferred_username || auth.user?.profile.username || auth.user?.profile.email || 'User'}</span>!
+          Welcome, <span className="font-semibold text-blue-700">{auth.user?.profile.name || auth.user?.id_token_claims?.['cognito:username'] || auth.user?.profile.username || auth.user?.profile.email || 'User'}</span>!
         </p>
 
         {/* URL Scan Section */}
@@ -220,12 +222,12 @@ function App() {
               />
               <button
                 onClick={subscribeEmail}
-                disabled={!email || subscribing}
+                disabled={!email || subscribingEmail} // Use subscribingEmail
                 className={`py-2 px-4 rounded-md font-bold transition duration-300 ease-in-out ${
-                  !email || subscribing ? 'bg-gray-400 cursor-not-allowed text-gray-600' : 'bg-blue-600 hover:bg-blue-700 text-white shadow-md'
+                  !email || subscribingEmail ? 'bg-gray-400 cursor-not-allowed text-gray-600' : 'bg-blue-600 hover:bg-blue-700 text-white shadow-md'
                 }`}
               >
-                {subscribing ? 'Subscribing...' : 'Subscribe Email'}
+                {subscribingEmail ? 'Subscribing...' : 'Subscribe Email'} // Use subscribingEmail
               </button>
             </div>
           </div>
@@ -244,12 +246,12 @@ function App() {
               />
               <button
                 onClick={subscribeSms}
-                disabled={!phoneNumber || subscribing}
+                disabled={!phoneNumber || subscribingSms} // Use subscribingSms
                 className={`py-2 px-4 rounded-md font-bold transition duration-300 ease-in-out ${
-                  !phoneNumber || subscribing ? 'bg-gray-400 cursor-not-allowed text-gray-600' : 'bg-blue-600 hover:bg-blue-700 text-white shadow-md'
+                  !phoneNumber || subscribingSms ? 'bg-gray-400 cursor-not-allowed text-gray-600' : 'bg-blue-600 hover:bg-blue-700 text-white shadow-md'
                 }`}
               >
-                {subscribing ? 'Subscribing...' : 'Subscribe SMS'}
+                {subscribingSms ? 'Subscribing...' : 'Subscribe SMS'} // Use subscribingSms
               </button>
             </div>
           </div>

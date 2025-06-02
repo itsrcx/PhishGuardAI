@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react'; // Import useRef
 import axios from 'axios';
 import { Amplify } from 'aws-amplify';
 import { withAuthenticator } from '@aws-amplify/ui-react';
 import { fetchAuthSession } from 'aws-amplify/auth';
 import '@aws-amplify/ui-react/styles.css';
+// import DOMPurify from 'dompurify'; // You would install and import dompurify for frontend sanitization
 
 
 Amplify.configure({
@@ -30,42 +31,39 @@ const MY_API_NAME = 'PhisGuardApis';
 
 const formFields = {
   signUp: {
-    name: { // Corresponds to 'name.formatted' in your error
+    name: {
       order: 1,
       label: 'Full Name',
       placeholder: 'Enter your full name',
       type: 'text',
       required: true,
     },
-    email: { // Corresponds to 'emails' in your error, using the standard Cognito attribute name
+    email: {
       order: 2,
       label: 'Email',
       placeholder: 'Enter your email',
       type: 'email',
       required: true,
     },
-    zoneinfo: { // Corresponds to 'timezone' in your error, standard Cognito attribute name is 'zoneinfo'
+    zoneinfo: {
       order: 7,
       label: 'Timezone',
       placeholder: 'e.g., America/New_York',
-      type: 'text', // Could also be a select with timezone options
+      type: 'text',
       required: true,
     },
-    // Amplify's Authenticator usually handles username and password fields automatically
-    // You might also need to configure 'username' if you are not using email/phone as username alias
   },
 };
 
 
-// Main App component for the PhishGuard AI application
-// Main App component for the PhishGuard AI application
 function App({ signOut, user }) {
   // State for URL input and list of URLs
   const [currentUrlInput, setCurrentUrlInput] = useState('');
   const [urlsToScan, setUrlsToScan] = useState([]);
 
-  // State for Email input
+  // State for Email input (will now store HTML)
   const [emailText, setEmailText] = useState('');
+  const emailTextInputRef = useRef(null); // Ref to access the contenteditable div
 
   // State for analysis results, errors, and loading
   const [analysisResults, setAnalysisResults] = useState([]);
@@ -73,7 +71,7 @@ function App({ signOut, user }) {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
 
   // State variables for email and phone number subscriptions
-  const [subscriptionEmail, setSubscriptionEmail] = useState(''); // Renamed to avoid conflict
+  const [subscriptionEmail, setSubscriptionEmail] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
   const [subscribeMessage, setSubscribeMessage] = useState(null);
   const [subscribeError, setSubscribeError] = useState(null);
@@ -148,6 +146,9 @@ function App({ signOut, user }) {
 
   // Function to handle scanning URLs and Email Text
   const handleAnalyzeContent = async () => {
+    // Frontend sanitization (optional but recommended if you are worried about display issues)
+    // const sanitizedEmailText = DOMPurify.sanitize(emailText.trim());
+
     if (urlsToScan.length === 0 && !emailText.trim()) {
       setAnalysisError("Please add at least one URL or enter email text to analyze.");
       setAnalysisResults([]);
@@ -170,11 +171,12 @@ function App({ signOut, user }) {
       }
     }
 
-    // Analyze Email Text
+    // Analyze Email Text (now potentially HTML)
     if (emailText.trim()) {
       try {
-        // Assuming a new endpoint '/analyze/email' for email text
-        const data = await makeApiCall('/scan/email', { text: emailText.trim() });
+        // Send the (potentially HTML) emailText to the backend
+        // Backend MUST be updated to parse HTML and extract links
+        const data = await makeApiCall('/scan/email', { email: emailText.trim() /* Or sanitizedEmailText */ });
         newResults.push({ id: 'email-1', type: 'Email', status: 'success', data });
       } catch (err) {
         newResults.push({ id: 'email-1', type: 'Email', status: 'error', error: err.message });
@@ -182,8 +184,11 @@ function App({ signOut, user }) {
     }
 
     setAnalysisResults(newResults);
-    setUrlsToScan([]); // <-- ADD THIS LINE
-    setEmailText('');   // <-- ADD THIS LINE
+    setUrlsToScan([]);
+    setEmailText('');
+    if (emailTextInputRef.current) {
+        emailTextInputRef.current.innerHTML = ''; // Clear contenteditable div directly
+    }
     setIsAnalyzing(false);
   };
 
@@ -230,7 +235,7 @@ function App({ signOut, user }) {
 
   return (
     <div className="min-h-screen flex flex-col items-center bg-gray-100 font-inter p-4">
-      <div className="bg-white p-8 rounded-lg shadow-md w-full max-w-xl mt-10"> {/* Increased max-w-xl */}
+      <div className="bg-white p-8 rounded-lg shadow-md w-full max-w-xl mt-10">
         <h1 className="text-3xl font-bold mb-4 text-gray-800 text-center">PhishGuard AI</h1>
         <p className="text-gray-600 mb-6 text-center">
           Welcome, <span className="font-semibold text-blue-700">{user?.username || user?.signInDetails?.loginId || 'User'}</span>!
@@ -283,17 +288,21 @@ function App({ signOut, user }) {
             )}
           </div>
 
-          {/* Email Text Input Section */}
+          {/* Email Text Input Section (now uses contenteditable div) */}
           <div className="mb-4">
-            <label htmlFor="emailTextInput" className="block text-gray-700 text-sm font-bold mb-1">Analyze Email Text:</label>
-            <textarea
-              id="emailTextInput"
-              value={emailText}
-              onChange={e => setEmailText(e.target.value)}
-              placeholder="Paste the full email text here for analysis..."
-              rows="5"
-              className="w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-800"
-            />
+            <label htmlFor="emailTextInputDiv" className="block text-gray-700 text-sm font-bold mb-1">Analyze Email Content (hyper link will be retained):</label>
+            <div
+              id="emailTextInputDiv"
+              ref={emailTextInputRef}
+              contentEditable="true"
+              onInput={e => setEmailText(e.currentTarget.innerHTML)}
+              // ONLY use dangerouslySetInnerHTML IF emailText has content
+              // Otherwise, we'll show the placeholder
+              {...(!emailText.trim() && { dangerouslySetInnerHTML: { __html: '<span class="text-gray-400">Paste the full email content here (HTML will be retained)...</span>' }})}
+              className="w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-800 min-h-[120px] overflow-y-auto"
+            >
+              {/* No direct children here */}
+            </div>
           </div>
           
           <button
@@ -319,6 +328,7 @@ function App({ signOut, user }) {
                 <div key={item.id} className={`p-4 rounded-md border ${item.status === 'success' ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
                   <h4 className="font-semibold text-gray-800">{item.type} Analysis: {item.input || 'Email Body'}</h4>
                   {item.status === 'success' ? (
+                    // Display raw JSON for now, your backend should return structured data
                     <pre className="whitespace-pre-wrap break-words text-sm bg-gray-100 p-3 mt-2 rounded-md overflow-x-auto text-gray-700">
                       {JSON.stringify(item.data, null, 2)}
                     </pre>

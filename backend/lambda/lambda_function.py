@@ -80,32 +80,13 @@ def extract_urls_from_email(email_text: str) -> List[str]:
 
     return normalized_urls
 
-def build_scan_result(content, is_phishing, is_email=False):
+def build_scan_result(urls, is_phishing, is_email=False):
     """
     Constructs a dictionary representing the URL scan result.
     """
     item_type_str = "Email" if is_email else "URL"
     reason_message = ""
-    url = ""
-
-    if is_email:
-        urls = extract_urls_from_email(content)
-        if not urls:
-            logger.warning("No URLs found in the provided email text.")
-            return {
-                "ScanID": str(uuid.uuid4()),
-                "URL": url,
-                "RiskLevel": "LOW",
-                "Timestamp": datetime.now(tz=timezone.utc).isoformat(),
-                "Details": {
-                    "is_phishing": False,
-                    "reason": "No URLs found in the email content."
-                }
-            }
-        url = (',').join(urls)
-    else:
-        url = content
-
+        
     if is_phishing:
         if is_email:
             reason_message = "Email content flagged as phishing based on indicators."
@@ -114,10 +95,10 @@ def build_scan_result(content, is_phishing, is_email=False):
     else:
         reason_message = f"No common phishing indicators detected in the {item_type_str}."
 
-    logger.info(f"Scan result for {item_type_str}: {url} - Risk Level: {'HIGH' if is_phishing else 'LOW'}")
+    logger.info(f"Scan result for {item_type_str}: {urls} - Risk Level: {'HIGH' if is_phishing else 'LOW'}")
     return {
         "ScanID": str(uuid.uuid4()),
-        "URL": url,
+        "URL": urls,
         "RiskLevel": "HIGH" if is_phishing else "LOW",
         "Timestamp": datetime.now(tz=timezone.utc).isoformat(),
         "Details": {
@@ -249,7 +230,7 @@ def lambda_handler(event, context):
         # --- Handle URL Scanning for Email ---
         # Matches API Gateway path /scan/email
         elif path == '/scan/email' and http_method == 'POST':
-            email_text = body.get('text', '')
+            email_text = body.get('email', '')
             if not email_text:
                 return {
                     'statusCode': 400,
@@ -259,8 +240,17 @@ def lambda_handler(event, context):
 
             # Placeholder for email scanning logic
             # In a real application, this would involve checking the email content or links
-            is_phish = "phishing" in email_text.lower()
+            urls = extract_urls_from_email(email_text)
+            if not urls:
+                return {
+                    'statusCode': 400,
+                    'headers': headers,
+                    'body': json.dumps({"message": "No URLs found in the email content."})
+                }
+            is_phish = any(is_phishing_url(url) for url in urls)
+
             result = build_scan_result(email_text, is_phish, is_email=True)
+            is_phish = result["Details"]["is_phishing"]
             save_to_dynamodb(result)
             if result["RiskLevel"] == "HIGH":
                 send_sns_alert(result.get("URL"))

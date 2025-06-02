@@ -249,7 +249,9 @@ def lambda_handler(event, context):
                 }
             is_phish = any(is_phishing_url(url) for url in urls)
 
-            result = build_scan_result(email_text, is_phish, is_email=True)
+            urls = (",").join(urls)  # Join URLs into a single string for the result
+
+            result = build_scan_result(urls, is_phish, is_email=True)
             is_phish = result["Details"]["is_phishing"]
             save_to_dynamodb(result)
             if result["RiskLevel"] == "HIGH":

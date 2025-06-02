@@ -1,12 +1,82 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import axios from 'axios';
-import { useAuth } from 'react-oidc-context';
+import { Amplify, API } from 'aws-amplify';
+import { withAuthenticator } from '@aws-amplify/ui-react';
+import { fetchAuthSession } from 'aws-amplify/auth';
+import '@aws-amplify/ui-react/styles.css';
+
+
+Amplify.configure({
+  Auth: {
+    Cognito: {
+      userPoolClientId: "6vvh4hcarjstddi3qtbp01ju9m",
+      userPoolId: "us-east-1_K00Q7Ztpo",
+    },
+  },
+  API: {
+    REST: {
+      PhisGuardApis: {
+        endpoint: 'https://429qv9l0ib.execute-api.us-east-1.amazonaws.com/api',
+        region: 'us-east-1',
+        authorizationType: 'AMAZON_COGNITO_USER_POOLS'
+      }
+    }
+  }
+});
+
+
+const formFields = {
+  signUp: {
+    birthdate: {
+      order: 5, // Order in the form
+      label: 'Birthdate',
+      placeholder: 'YYYY-MM-DD',
+      type: 'date',
+      required: true, // Make sure it's required in the form
+    },
+    gender: {
+      order: 6,
+      label: 'Gender',
+      type: 'text', // Or a dropdown, e.g., 'select' with options
+      placeholder: 'Enter your gender',
+      required: true,
+    },
+    phone_number: { // Corresponds to 'phoneNumbers' in your error
+      order: 3,
+      label: 'Phone Number',
+      placeholder: 'e.g., +919876543210',
+      type: 'tel',
+      required: true,
+    },
+    name: { // Corresponds to 'name.formatted' in your error
+      order: 4,
+      label: 'Full Name',
+      placeholder: 'Enter your full name',
+      type: 'text',
+      required: true,
+    },
+    email: { // Corresponds to 'emails' in your error, using the standard Cognito attribute name
+      order: 2,
+      label: 'Email',
+      placeholder: 'Enter your email',
+      type: 'email',
+      required: true,
+    },
+    zoneinfo: { // Corresponds to 'timezone' in your error, standard Cognito attribute name is 'zoneinfo'
+      order: 7,
+      label: 'Timezone',
+      placeholder: 'e.g., America/New_York',
+      type: 'text', // Could also be a select with timezone options
+      required: true,
+    },
+    // Amplify's Authenticator usually handles username and password fields automatically
+    // You might also need to configure 'username' if you are not using email/phone as username alias
+  },
+};
+
 
 // Main App component for the PhishGuard AI application
-function App() {
-  // Hook to access authentication state and methods from react-oidc-context
-  const auth = useAuth();
-
+function App({ signOut, user }) { // Props passed by withAuthenticator
   // State variables for the URL input, API result, error messages, and loading status
   const [url, setUrl] = useState('');
   const [result, setResult] = useState(null);
@@ -21,22 +91,26 @@ function App() {
   const [subscribingEmail, setSubscribingEmail] = useState(false);
   const [subscribingSms, setSubscribingSms] = useState(false);
 
-  // Define constants for Cognito configuration (was used in logout redirect).
-  const CLIENT_ID = "6vvh4hcarjstddi3qtbp01ju9m";
-  const COGNITO_DOMAIN = "https://us-east-1k00q7ztpo.auth.us-east-1.amazoncognito.com";
-  const LOGOUT_URI = "https://frontend.d2b6jum2293iep.amplifyapp.com/";
-
   // Base URL for your API Gateway endpoint
+  // This can also be accessed via Amplify.API.REST.YourAPIName.endpoint
   const API_BASE_URL = 'https://429qv9l0ib.execute-api.us-east-1.amazonaws.com/api';
 
+
+  // Helper function to get the authentication token
+  const getAuthToken = async () => {
+    const session = await fetchAuthSession();
+    return session.tokens?.idToken?.toString();
+  };
+
   // Helper function to handle API calls consistently
-  // It now accepts a state setter for the specific operation's loading state
   const makeApiCall = async (path, data, setOperationLoading) => {
     setSubscribeMessage(null);
     setSubscribeError(null);
-    setOperationLoading(true); // Set the specific operation's loading state
+    setOperationLoading(true);
     try {
-      const token = auth.user?.id_token; // Use access_token for API authorization
+      // Amplify's API category automatically handles signing requests with the authenticated user's credentials
+      // You can also get the session token using Auth.currentSession() if needed for manual axios calls
+      const token = await getAuthToken();
 
       if (!token) {
         throw new Error("Authentication token not found. Please sign in again.");
@@ -47,7 +121,7 @@ function App() {
         data,
         {
           headers: {
-            Authorization: `Bearer ${token}`,
+            Authorization: `Bearer ${token}`, // Use the ID token for authorization
             'Content-Type': 'application/json',
           },
         }
@@ -63,9 +137,9 @@ function App() {
       } else {
         setSubscribeError(`An unexpected error occurred: ${err.message}`);
       }
-      throw err; // Re-throw to be caught by specific handlers if needed
+      throw err;
     } finally {
-      setOperationLoading(false); // Clear the specific operation's loading state
+      setOperationLoading(false);
     }
   };
 
@@ -73,18 +147,17 @@ function App() {
   const scanUrl = async () => {
     if (!url) return;
 
-    setLoading(true); // Keep this specific loading state for scan
+    setLoading(true);
     setError(null);
     setResult(null);
 
     try {
-      // Pass setLoading to makeApiCall for the scan operation
       const data = await makeApiCall('/scan', { url }, setLoading);
       setResult(data);
     } catch (err) {
-      // Error is already set by makeApiCall, no need to duplicate
+      // Error is already set by makeApiCall
     } finally {
-      setLoading(false); // This will be set by makeApiCall now, but keeping for clarity
+      setLoading(false);
     }
   };
 
@@ -95,9 +168,8 @@ function App() {
       return;
     }
     try {
-      // Pass setSubscribingEmail to makeApiCall for the email subscription operation
       await makeApiCall('/subscribe/email', { email }, setSubscribingEmail);
-      setEmail(''); // Clear input on success
+      setEmail('');
     } catch (err) {
       // Error is already set by makeApiCall
     }
@@ -110,62 +182,19 @@ function App() {
       return;
     }
     try {
-      // Pass setSubscribingSms to makeApiCall for the SMS subscription operation
       await makeApiCall('/subscribe/sms', { phoneNumber }, setSubscribingSms);
-      setPhoneNumber(''); // Clear input on success
+      setPhoneNumber('');
     } catch (err) {
       // Error is already set by makeApiCall
     }
   };
 
-  // Function to redirect to Cognito for a full sign-out
-  const signOutRedirect = () => {
-    window.location.href = `${COGNITO_DOMAIN}/logout?client_id=${CLIENT_ID}&logout_uri=${encodeURIComponent(LOGOUT_URI)}`;
-  };
-
-  // Display loading state while authentication is in progress
-  if (auth.isLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-gray-100 font-inter">
-        <div className="text-xl text-gray-700">Loading authentication...</div>
-      </div>
-    );
-  }
-
-  // Display error state if authentication fails
-  if (auth.error) {
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-red-100 font-inter">
-        <div className="text-xl text-red-700">Error: {auth.error.message}</div>
-      </div>
-    );
-  }
-
-  // If not authenticated, display the sign-in button
-  if (!auth.isAuthenticated) {
-    return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100 font-inter p-4">
-        <div className="bg-white p-8 rounded-lg shadow-md text-center w-full max-w-sm">
-          <h1 className="text-3xl font-bold mb-4 text-gray-800">PhishGuard AI</h1>
-          <p className="text-gray-600 mb-6">Please sign in to access the URL scanning service.</p>
-          <button
-            onClick={() => auth.signinRedirect()}
-            className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-lg shadow-md transition duration-300 ease-in-out w-full"
-          >
-            Sign In with Cognito
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  // If authenticated, display the main application content
   return (
     <div className="min-h-screen flex flex-col items-center bg-gray-100 font-inter p-4">
       <div className="bg-white p-8 rounded-lg shadow-md w-full max-w-md mt-10">
         <h1 className="text-3xl font-bold mb-4 text-gray-800 text-center">PhishGuard AI</h1>
         <p className="text-gray-600 mb-6 text-center">
-          Welcome, <span className="font-semibold text-blue-700">{auth.user?.profile.name || auth.user?.profile?.['cognito:username'] || auth.user?.profile.email || 'User'}</span>!
+          Welcome, <span className="font-semibold text-blue-700">{user?.username || user?.attributes?.email || 'User'}</span>!
         </p>
 
         {/* URL Scan Section */}
@@ -222,7 +251,7 @@ function App() {
               />
               <button
                 onClick={subscribeEmail}
-                disabled={!email || subscribingEmail} // Use subscribingEmail
+                disabled={!email || subscribingEmail}
                 className={`py-2 px-4 rounded-md font-bold transition duration-300 ease-in-out ${
                   !email || subscribingEmail ? 'bg-gray-400 cursor-not-allowed text-gray-600' : 'bg-blue-600 hover:bg-blue-700 text-white shadow-md'
                 }`}
@@ -237,7 +266,7 @@ function App() {
             <label htmlFor="phoneInput" className="block text-gray-700 text-sm font-bold mb-2">SMS Subscription:</label>
             <div className="flex flex-col sm:flex-row gap-2">
               <input
-                type="tel" // Use type="tel" for phone numbers
+                type="tel"
                 id="phoneInput"
                 value={phoneNumber}
                 onChange={e => setPhoneNumber(e.target.value)}
@@ -246,7 +275,7 @@ function App() {
               />
               <button
                 onClick={subscribeSms}
-                disabled={!phoneNumber || subscribingSms} // Use subscribingSms
+                disabled={!phoneNumber || subscribingSms}
                 className={`py-2 px-4 rounded-md font-bold transition duration-300 ease-in-out ${
                   !phoneNumber || subscribingSms ? 'bg-gray-400 cursor-not-allowed text-gray-600' : 'bg-blue-600 hover:bg-blue-700 text-white shadow-md'
                 }`}
@@ -271,7 +300,7 @@ function App() {
         {/* Sign Out Button */}
         <div className="flex flex-col sm:flex-row justify-center gap-4">
           <button
-            onClick={() => auth.removeUser()}
+            onClick={signOut} // Use signOut provided by withAuthenticator
             className="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-md shadow-md transition duration-300 ease-in-out flex-1"
           >
             Sign out
@@ -282,4 +311,4 @@ function App() {
   );
 }
 
-export default App;
+export default withAuthenticator(App, { formFields });

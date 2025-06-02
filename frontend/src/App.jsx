@@ -10,15 +10,15 @@ import '@aws-amplify/ui-react/styles.css';
 Amplify.configure({
   Auth: {
     Cognito: {
-      userPoolClientId: "61aksv3gle8jkhrrh19s9v8h6u",
-      userPoolId: "us-east-1_fs5K43MNt",
+      userPoolClientId: "5do2qgadcanh5e9d5ev46jmde3",
+      userPoolId: "ap-south-1_crUXNPVNp",
     },
   },
   API: {
     REST: {
       PhisGuardApis: {
-        endpoint: 'https://429qv9l0ib.execute-api.us-east-1.amazonaws.com/api',
-        region: 'us-east-1',
+        endpoint: 'https://zmfttxov36.execute-api.ap-south-1.amazonaws.com/api',
+        region: 'ap-south-1',
         authorizationType: 'AMAZON_COGNITO_USER_POOLS'
       }
     }

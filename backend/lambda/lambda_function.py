@@ -1,5 +1,8 @@
 import os
+import re
 import json
+from typing import List
+
 import boto3
 from datetime import datetime, timezone
 import uuid
@@ -29,18 +32,97 @@ def is_phishing_url(url):
     # Simple check: if "login" or "secure" is in the URL, flag as high risk
     return "login" in url.lower() or "secure" in url.lower()
 
-def build_scan_result(url, is_phishing):
+def extract_urls_from_email(email_text: str) -> List[str]:
+    """
+    Parses email text and extracts all URLs found within it.
+
+    Args:
+        email_text: The raw text content of the email.
+
+    Returns:
+        A list of URL strings found in the email text.
+        Returns an empty list if no URLs are found.
+    """
+    if not email_text:
+        return []
+
+    # This regex aims to capture common URL patterns:
+    # - http:// or https:// protocols
+    # - www. domains (without protocol)
+    # - Domains with various TLDs
+    # - Optional paths, query parameters, and fragments
+    # It's a fairly comprehensive regex but might not catch 100% of all theoretical URL formats.
+    # Breakdown:
+    # (?:https?://|www\.)                       - Matches http://, https://, or www. (non-capturing group)
+    # (?:[\w-]+\.)+                             - Matches domain name parts (e.g., example.) one or more times
+    # [\w-]+                                    - Matches the top-level domain (e.g., com, org)
+    # (?:/[^\s]*)?                              - Optionally matches a path, query params, fragment (anything after / that's not whitespace)
+    # The overall regex is designed to be somewhat flexible.
+    url_pattern = re.compile(
+        r'(?:(?:https?://|ftp://|file://)|www\.)'  # Protocols or www
+        r'(?:(?:[A-Z0-9](?:[A-Z0-9-]{0,61}[A-Z0-9])?\.)+(?:[A-Z]{2,6}\.?|[A-Z0-9-]{2,}\.?)|'  # domain...
+        r'localhost|'  # localhost...
+        r'\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})'  # ...or ip
+        r'(?::\d+)?'  # optional port
+        r'(?:/?|[/?]\S+)', re.IGNORECASE) # optional path
+
+    # Find all non-overlapping matches of the pattern in the string
+    found_urls = re.findall(url_pattern, email_text)
+
+    # Normalize URLs that start with 'www.' but lack a protocol by adding 'http://'
+    # This is a common convention for how such URLs are treated by browsers.
+    normalized_urls = []
+    for url in found_urls:
+        if url.lower().startswith('www.'):
+            normalized_urls.append('http://' + url)
+        else:
+            normalized_urls.append(url)
+
+    return normalized_urls
+
+def build_scan_result(content, is_phishing, is_email=False):
     """
     Constructs a dictionary representing the URL scan result.
     """
+    item_type_str = "Email" if is_email else "URL"
+    reason_message = ""
+    url = ""
+
+    if is_email:
+        urls = extract_urls_from_email(content)
+        if not urls:
+            logger.warning("No URLs found in the provided email text.")
+            return {
+                "ScanID": str(uuid.uuid4()),
+                "URL": url,
+                "RiskLevel": "LOW",
+                "Timestamp": datetime.now(tz=timezone.utc).isoformat(),
+                "Details": {
+                    "is_phishing": False,
+                    "reason": "No URLs found in the email content."
+                }
+            }
+        url = (',').join(urls)
+    else:
+        url = content
+
+    if is_phishing:
+        if is_email:
+            reason_message = "Email content flagged as phishing based on indicators."
+        else:
+            reason_message = "URL flagged as phishing based on indicators."
+    else:
+        reason_message = f"No common phishing indicators detected in the {item_type_str}."
+
+    logger.info(f"Scan result for {item_type_str}: {url} - Risk Level: {'HIGH' if is_phishing else 'LOW'}")
     return {
-        "ScanID": str(uuid.uuid4()), # Unique ID for each scan
+        "ScanID": str(uuid.uuid4()),
         "URL": url,
         "RiskLevel": "HIGH" if is_phishing else "LOW",
-        "Timestamp": datetime.now(tz=timezone.utc).isoformat(), # UTC timestamp
+        "Timestamp": datetime.now(tz=timezone.utc).isoformat(),
         "Details": {
             "is_phishing": is_phishing,
-            "reason": "Contains 'login' or 'secure' in URL" if is_phishing else "No common phishing indicators detected"
+            "reason": reason_message,
         }
     }
 
@@ -142,7 +224,7 @@ def lambda_handler(event, context):
 
         # --- Handle URL Scanning ---
         # Matches API Gateway path /scan
-        if path == '/scan' and http_method == 'POST':
+        if path == '/scan/url' and http_method == 'POST':
             url = body.get('url', '')
             if not url:
                 return {
@@ -158,6 +240,30 @@ def lambda_handler(event, context):
             if result["RiskLevel"] == "HIGH":
                 send_sns_alert(url)
 
+            return {
+                'statusCode': 200,
+                'headers': headers,
+                'body': json.dumps(result)
+            }
+        
+        # --- Handle URL Scanning for Email ---
+        # Matches API Gateway path /scan/email
+        elif path == '/scan/email' and http_method == 'POST':
+            email_text = body.get('text', '')
+            if not email_text:
+                return {
+                    'statusCode': 400,
+                    'headers': headers,
+                    'body': json.dumps({"message": "Email is required for scanning."})
+                }
+
+            # Placeholder for email scanning logic
+            # In a real application, this would involve checking the email content or links
+            is_phish = "phishing" in email_text.lower()
+            result = build_scan_result(email_text, is_phish, is_email=True)
+            save_to_dynamodb(result)
+            if result["RiskLevel"] == "HIGH":
+                send_sns_alert(result.get("URL"))
             return {
                 'statusCode': 200,
                 'headers': headers,

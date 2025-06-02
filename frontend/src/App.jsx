@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import axios from 'axios';
-import { Amplify, API } from 'aws-amplify';
+import { Amplify } from 'aws-amplify';
 import { withAuthenticator } from '@aws-amplify/ui-react';
 import { fetchAuthSession } from 'aws-amplify/auth';
 import '@aws-amplify/ui-react/styles.css';
@@ -27,29 +27,8 @@ Amplify.configure({
 
 const formFields = {
   signUp: {
-    birthdate: {
-      order: 5, // Order in the form
-      label: 'Birthdate',
-      placeholder: 'YYYY-MM-DD',
-      type: 'date',
-      required: true, // Make sure it's required in the form
-    },
-    gender: {
-      order: 6,
-      label: 'Gender',
-      type: 'text', // Or a dropdown, e.g., 'select' with options
-      placeholder: 'Enter your gender',
-      required: true,
-    },
-    phone_number: { // Corresponds to 'phoneNumbers' in your error
-      order: 3,
-      label: 'Phone Number',
-      placeholder: 'e.g., +919876543210',
-      type: 'tel',
-      required: true,
-    },
     name: { // Corresponds to 'name.formatted' in your error
-      order: 4,
+      order: 1,
       label: 'Full Name',
       placeholder: 'Enter your full name',
       type: 'text',
@@ -104,8 +83,8 @@ function App({ signOut, user }) { // Props passed by withAuthenticator
 
   // Helper function to handle API calls consistently
   const makeApiCall = async (path, data, setOperationLoading) => {
-    setSubscribeMessage(null);
-    setSubscribeError(null);
+    setSubscribeMessage(null); // Clear previous success messages
+    setSubscribeError(null);   // Clear previous error messages
     setOperationLoading(true);
     try {
       // Amplify's API category automatically handles signing requests with the authenticated user's credentials
@@ -145,7 +124,11 @@ function App({ signOut, user }) { // Props passed by withAuthenticator
 
   // Function to handle scanning the entered URL
   const scanUrl = async () => {
-    if (!url) return;
+    if (!url) {
+      setError("Please enter a URL to scan.");
+      setResult(null); // Clear previous results
+      return;
+    }
 
     setLoading(true);
     setError(null);
@@ -169,7 +152,7 @@ function App({ signOut, user }) { // Props passed by withAuthenticator
     }
     try {
       await makeApiCall('/subscribe/email', { email }, setSubscribingEmail);
-      setEmail('');
+      setEmail(''); // Clear email input on success
     } catch (err) {
       // Error is already set by makeApiCall
     }
@@ -183,7 +166,7 @@ function App({ signOut, user }) { // Props passed by withAuthenticator
     }
     try {
       await makeApiCall('/subscribe/sms', { phoneNumber }, setSubscribingSms);
-      setPhoneNumber('');
+      setPhoneNumber(''); // Clear phone number input on success
     } catch (err) {
       // Error is already set by makeApiCall
     }

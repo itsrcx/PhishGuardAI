@@ -1,6 +1,26 @@
-# PhishGuardAI
+# PHISHGUARDAI
 
-PhishGuardAI is a web application that helps users detect potential phishing URLs using AI-powered backend logic. The project consists of a React frontend and an AWS Lambda backend, with integration to DynamoDB and SNS for alerting.
+*Empower Your Safety, Outsmart Phishing Threats Today*
+
+![last commit](https://img.shields.io/badge/last%20commit-today-2ea44f)
+![notebook](https://img.shields.io/badge/jupyter%20notebook-54.3%25-blue)
+![languages](https://img.shields.io/badge/languages-4-blue)
+
+---
+
+## Built with the tools and technologies:
+
+![JSON](https://img.shields.io/badge/-JSON-black?logo=json&logoColor=white)
+![Markdown](https://img.shields.io/badge/-Markdown-white?logo=markdown&logoColor=black)
+![npm](https://img.shields.io/badge/-npm-red?logo=npm&logoColor=white)
+![AWS Amplify](https://img.shields.io/badge/-AWS%20Amplify-orange?logo=awsamplify&logoColor=white)
+![JavaScript](https://img.shields.io/badge/-JavaScript-yellow?logo=javascript&logoColor=black)
+
+![React](https://img.shields.io/badge/-React-61dafb?logo=react&logoColor=black)
+![Python](https://img.shields.io/badge/-Python-3776AB?logo=python&logoColor=white)
+![Vite](https://img.shields.io/badge/-Vite-646cff?logo=vite&logoColor=white)
+![ESLint](https://img.shields.io/badge/-ESLint-4B32C3?logo=eslint&logoColor=white)
+![Axios](https://img.shields.io/badge/-Axios-5A29E4?logo=axios&logoColor=white)
 
 ## Features
 
@@ -30,12 +50,12 @@ PhishGuardAI is a web application that helps users detect potential phishing URL
 2. Start the development server:
 
     ```sh
-    npm start
+    npm run dev
     ```
 
-3. Open [http://localhost:3000](http://localhost:3000) to use the app.
+3. Open [http://localhost:5173](http://localhost:5173) to use the app.
 
-### Backend
+### Backend (Custom creation on aws console for now ... Automation InProgress!)
 
 - The backend is an AWS Lambda function ([`backend/lambda_function.py`](backend/lambda_function.py)) that:
   - Receives POST requests with a URL.
@@ -49,7 +69,7 @@ PhishGuardAI is a web application that helps users detect potential phishing URL
 
 ### Deployment
 
-- The project uses Amplify for CI/CD. See [`config/amplify.yml`](config/amplify.yml) for build steps.
+- The project uses Amplify for CI/CD. See [`frontend/amplify_yml/buildspec.yml`](frontend/amplify_yml/buildspec.yml) for build steps.
 
 ## Usage
 
@@ -59,7 +79,7 @@ PhishGuardAI is a web application that helps users detect potential phishing URL
 
 ## License
 
-MIT License
+....
 
 ---
 

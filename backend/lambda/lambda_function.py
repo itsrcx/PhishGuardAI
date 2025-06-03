@@ -34,45 +34,32 @@ def is_phishing_url(url):
 
 def extract_urls_from_email(email_text: str) -> List[str]:
     """
-    Parses email text and extracts all URLs found within it.
+    Parses email text and extracts all URLs found within it, including paths.
 
     Args:
         email_text: The raw text content of the email.
 
     Returns:
-        A list of URL strings found in the email text.
+        A list of full URL strings found in the email text.
         Returns an empty list if no URLs are found.
     """
     if not email_text:
         return []
 
-    # This regex aims to capture common URL patterns:
-    # - http:// or https:// protocols
-    # - www. domains (without protocol)
-    # - Domains with various TLDs
-    # - Optional paths, query parameters, and fragments
-    # It's a fairly comprehensive regex but might not catch 100% of all theoretical URL formats.
-    # Breakdown:
-    # (?:https?://|www\.)                       - Matches http://, https://, or www. (non-capturing group)
-    # (?:[\w-]+\.)+                             - Matches domain name parts (e.g., example.) one or more times
-    # [\w-]+                                    - Matches the top-level domain (e.g., com, org)
-    # (?:/[^\s]*)?                              - Optionally matches a path, query params, fragment (anything after / that's not whitespace)
-    # The overall regex is designed to be somewhat flexible.
     url_pattern = re.compile(
-        r'(?:(?:https?://|ftp://|file://)|www\.)'  # Protocols or www
-        r'(?:(?:[A-Z0-9](?:[A-Z0-9-]{0,61}[A-Z0-9])?\.)+(?:[A-Z]{2,6}\.?|[A-Z0-9-]{2,}\.?)|'  # domain...
-        r'localhost|'  # localhost...
-        r'\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})'  # ...or ip
-        r'(?::\d+)?'  # optional port
-        r'(?:/?|[/?]\S+)', re.IGNORECASE) # optional path
+        r'(?:(?:https?|ftp|file)://|www\.)'              # protocol or www
+        r'(?:[A-Z0-9](?:[A-Z0-9-]{0,61}[A-Z0-9])?\.)+'    # domain name part
+        r'(?:[A-Z]{2,6}\.?|[A-Z0-9-]{2,}\.?)'             # TLD
+        r'(?::\d+)?'                                      # optional port
+        r'(?:/[^\s]*)?',                                  # optional path/query/fragment
+        re.IGNORECASE
+    )
 
-    # Find all non-overlapping matches of the pattern in the string
-    found_urls = re.findall(url_pattern, email_text)
+    matches = re.finditer(url_pattern, email_text)
 
-    # Normalize URLs that start with 'www.' but lack a protocol by adding 'http://'
-    # This is a common convention for how such URLs are treated by browsers.
     normalized_urls = []
-    for url in found_urls:
+    for match in matches:
+        url = match.group()
         if url.lower().startswith('www.'):
             normalized_urls.append('http://' + url)
         else:

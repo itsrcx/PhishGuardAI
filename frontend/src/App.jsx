@@ -5,7 +5,7 @@ import { withAuthenticator } from '@aws-amplify/ui-react';
 import { fetchAuthSession } from 'aws-amplify/auth';
 import '@aws-amplify/ui-react/styles.css';
 
-
+// Configure Amplify
 Amplify.configure({
   Auth: {
     Cognito: {
@@ -24,35 +24,8 @@ Amplify.configure({
   }
 });
 
-
+// API Name constant
 const MY_API_NAME = 'PhisGuardApis';
-
-
-const formFields = {
-  signUp: {
-    name: {
-      order: 1,
-      label: 'Full Name',
-      placeholder: 'Enter your full name',
-      type: 'text',
-      required: true,
-    },
-    email: {
-      order: 2,
-      label: 'Email',
-      placeholder: 'Enter your email',
-      type: 'email',
-      required: true,
-    },
-    zoneinfo: {
-      order: 7,
-      label: 'Timezone',
-      placeholder: 'e.g., America/New_York',
-      type: 'text',
-      required: true,
-    },
-  },
-};
 
 
 function App({ signOut, user }) {
@@ -60,7 +33,7 @@ function App({ signOut, user }) {
   const [currentUrlInput, setCurrentUrlInput] = useState('');
   const [urlsToScan, setUrlsToScan] = useState([]);
 
-  // State for Email input (will now store HTML)
+  // State for Email input (stores HTML content from contenteditable div)
   const [emailText, setEmailText] = useState('');
   const emailTextInputRef = useRef(null); // Ref to access the contenteditable div
 
@@ -69,33 +42,33 @@ function App({ signOut, user }) {
   const [analysisError, setAnalysisError] = useState(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
 
-  // State variables for email and phone number subscriptions
-  const [subscriptionEmail, setSubscriptionEmail] = useState('');
-  const [phoneNumber, setPhoneNumber] = useState('');
-  const [subscribeMessage, setSubscribeMessage] = useState(null);
-  const [subscribeError, setSubscribeError] = useState(null);
-  const [subscribingEmail, setSubscribingEmail] = useState(false);
-  const [subscribingSms, setSubscribingSms] = useState(false);
-
+  // Get API Base URL from Amplify configuration
   const API_BASE_URL = Amplify.getConfig().API.REST[MY_API_NAME].endpoint;
-
 
   // Helper function to get the authentication token
   const getAuthToken = async () => {
     try {
       const session = await fetchAuthSession();
-      return session.tokens?.idToken?.toString();
+      // Ensure tokens exist and idToken is present
+      if (session.tokens && session.tokens.idToken) {
+        return session.tokens.idToken.toString();
+      }
+      throw new Error("ID token not found in session.");
     } catch (error) {
       console.error("Error fetching auth session:", error);
+      // It's good practice to inform the user or handle this more gracefully
+      setAnalysisError("Failed to retrieve authentication session. Please try signing out and in again.");
       throw new Error("Failed to retrieve authentication session.");
     }
   };
 
   // Generalized Helper function to handle API calls
   const makeApiCall = async (path, data) => {
-    const token = await getAuthToken();
-    if (!token) {
-      throw new Error("Authentication token not found. Please sign in again.");
+    let token;
+    try {
+      token = await getAuthToken();
+    } catch (authError) {
+      throw authError;
     }
 
     try {
@@ -109,14 +82,17 @@ function App({ signOut, user }) {
           },
         }
       );
-      return res.data;
+      return res.data; // Return response data
     } catch (err) {
       console.error("API call error details:", err);
       if (err.response) {
+        // Handle API errors (e.g., 4xx, 5xx)
         throw new Error(`Error ${err.response.status}: ${err.response.data?.message || err.response.statusText || 'Unknown API error'}`);
       } else if (err.request) {
-        throw new Error("Network error: No response from API.");
+        // Handle network errors (request made but no response)
+        throw new Error("Network error: No response from API. Please check your connection.");
       } else {
+        // Handle other errors
         throw new Error(`An unexpected error occurred: ${err.message}`);
       }
     }
@@ -134,8 +110,8 @@ function App({ signOut, user }) {
         return;
     }
     setUrlsToScan([...urlsToScan, currentUrlInput.trim()]);
-    setCurrentUrlInput('');
-    setAnalysisError(null); // Clear error if any
+    setCurrentUrlInput(''); // Clear input field
+    setAnalysisError(null); // Clear any previous error
   };
 
   // Function to remove URL from the list
@@ -145,91 +121,52 @@ function App({ signOut, user }) {
 
   // Function to handle scanning URLs and Email Text
   const handleAnalyzeContent = async () => {
-    // Frontend sanitization (optional but recommended if you are worried about display issues)
+    // Frontend sanitization could be done here if needed using a library like DOMPurify
     // const sanitizedEmailText = DOMPurify.sanitize(emailText.trim());
 
     if (urlsToScan.length === 0 && !emailText.trim()) {
       setAnalysisError("Please add at least one URL or enter email text to analyze.");
-      setAnalysisResults([]);
+      setAnalysisResults([]); // Clear any previous results
       return;
     }
 
     setIsAnalyzing(true);
     setAnalysisError(null);
-    setAnalysisResults([]); // Clear previous results
+    setAnalysisResults([]); // Clear previous results before new analysis
     const newResults = [];
 
     // Analyze URLs
-    for (let i = 0; i < urlsToScan.length; i++) {
-      const url = urlsToScan[i];
-      try {
-        const data = await makeApiCall('/scan/url', { url });
-        newResults.push({ id: `url-${i}`, type: 'URL', input: url, status: 'success', data });
-      } catch (err) {
-        newResults.push({ id: `url-${i}`, type: 'URL', input: url, status: 'error', error: err.message });
-      }
+    if (urlsToScan.length > 0) {
+        for (let i = 0; i < urlsToScan.length; i++) {
+          const url = urlsToScan[i];
+          try {
+            const data = await makeApiCall('/scan/url', { url });
+            newResults.push({ id: `url-${i}-${Date.now()}`, type: 'URL', input: url, status: 'success', data });
+          } catch (err) {
+            newResults.push({ id: `url-${i}-${Date.now()}`, type: 'URL', input: url, status: 'error', error: err.message });
+          }
+        }
     }
 
-    // Analyze Email Text (now potentially HTML)
+    // Analyze Email Text (HTML content)
     if (emailText.trim()) {
       try {
-        // Send the (potentially HTML) emailText to the backend
-        // Backend MUST be updated to parse HTML and extract links
-        const data = await makeApiCall('/scan/email', { email: emailText.trim() /* Or sanitizedEmailText */ });
-        newResults.push({ id: 'email-1', type: 'Email', status: 'success', data });
+        // Send the HTML emailText to the backend
+        // The backend needs to be capable of parsing HTML and extracting links for analysis
+        const data = await makeApiCall('/scan/email', { email: emailText.trim() /* or sanitizedEmailText */ });
+        newResults.push({ id: `email-1-${Date.now()}`, type: 'Email', status: 'success', data });
       } catch (err) {
-        newResults.push({ id: 'email-1', type: 'Email', status: 'error', error: err.message });
+        newResults.push({ id: `email-1-${Date.now()}`, type: 'Email', status: 'error', error: err.message });
       }
     }
 
     setAnalysisResults(newResults);
-    setUrlsToScan([]);
-    setEmailText('');
+    setUrlsToScan([]); // Clear scanned URLs
+    setEmailText('');   // Clear email text
     if (emailTextInputRef.current) {
         emailTextInputRef.current.innerHTML = ''; // Clear contenteditable div directly
     }
     setIsAnalyzing(false);
-  };
-
-
-  // Function to handle email subscription
-  const subscribeEmail = async () => {
-    if (!subscriptionEmail) {
-      setSubscribeError("Email is required for subscription.");
-      return;
-    }
-    setSubscribingEmail(true);
-    setSubscribeMessage(null);
-    setSubscribeError(null);
-    try {
-      const response = await makeApiCall('/subscribe/email', { email: subscriptionEmail });
-      setSubscribeMessage(response.message || "Subscription successful!");
-      setSubscriptionEmail('');
-    } catch (err) {
-      setSubscribeError(err.message);
-    } finally {
-      setSubscribingEmail(false);
-    }
-  };
-
-  // Function to handle SMS subscription
-  const subscribeSms = async () => {
-    if (!phoneNumber) {
-      setSubscribeError("Phone number is required for SMS subscription.");
-      return;
-    }
-    setSubscribingSms(true);
-    setSubscribeMessage(null);
-    setSubscribeError(null);
-    try {
-      const response = await makeApiCall('/subscribe/sms', { phoneNumber });
-      setSubscribeMessage(response.message || "Subscription successful!");
-      setPhoneNumber('');
-    } catch (err) {
-      setSubscribeError(err.message);
-    } finally {
-      setSubscribingSms(false);
-    }
   };
 
   return (
@@ -340,73 +277,11 @@ function App({ signOut, user }) {
           )}
         </div>
 
-        {/* SNS Subscription Section */}
-        <div className="mb-8 p-4 border border-gray-200 rounded-md bg-gray-50">
-          <h2 className="text-xl font-semibold mb-3 text-gray-800">Subscribe to Phishing Alerts</h2>
-          
-          <div className="mb-4">
-            <label htmlFor="emailSubInput" className="block text-gray-700 text-sm font-bold mb-2">Email Subscription:</label>
-            <div className="flex flex-col sm:flex-row gap-2">
-              <input
-                type="email"
-                id="emailSubInput"
-                value={subscriptionEmail}
-                onChange={e => setSubscriptionEmail(e.target.value)}
-                placeholder="Enter email for alerts"
-                className="flex-1 p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-800"
-              />
-              <button
-                onClick={subscribeEmail}
-                disabled={!subscriptionEmail || subscribingEmail}
-                className={`py-2 px-4 rounded-md font-bold transition duration-300 ease-in-out ${
-                  !subscriptionEmail || subscribingEmail ? 'bg-gray-400 cursor-not-allowed text-gray-600' : 'bg-blue-600 hover:bg-blue-700 text-white shadow-md'
-                }`}
-              >
-                {subscribingEmail ? 'Subscribing...' : 'Subscribe Email'}
-              </button>
-            </div>
-          </div>
-
-          <div>
-            <label htmlFor="phoneInput" className="block text-gray-700 text-sm font-bold mb-2">SMS Subscription:</label>
-            <div className="flex flex-col sm:flex-row gap-2">
-              <input
-                type="tel"
-                id="phoneInput"
-                value={phoneNumber}
-                onChange={e => setPhoneNumber(e.target.value)}
-                placeholder="Enter phone number (e.g., +12065550100)"
-                className="flex-1 p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-800"
-              />
-              <button
-                onClick={subscribeSms}
-                disabled={!phoneNumber || subscribingSms}
-                className={`py-2 px-4 rounded-md font-bold transition duration-300 ease-in-out ${
-                  !phoneNumber || subscribingSms ? 'bg-gray-400 cursor-not-allowed text-gray-600' : 'bg-blue-600 hover:bg-blue-700 text-white shadow-md'
-                }`}
-              >
-                {subscribingSms ? 'Subscribing...' : 'Subscribe SMS'}
-              </button>
-            </div>
-          </div>
-          
-          {subscribeError && (
-            <p className="text-red-600 text-center mt-4 p-3 bg-red-100 border border-red-300 rounded-md">
-              {subscribeError}
-            </p>
-          )}
-          {subscribeMessage && (
-            <p className="text-green-600 text-center mt-4 p-3 bg-green-100 border border-green-300 rounded-md">
-              {subscribeMessage}
-            </p>
-          )}
-        </div>
-
         {/* Sign Out Button */}
-        <div className="flex flex-col sm:flex-row justify-center gap-4">
+        <div className="flex flex-col items-center mt-8">
           <button
             onClick={signOut}
-            className="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-md shadow-md transition duration-300 ease-in-out flex-1"
+            className="bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-8 rounded-lg shadow-md hover:shadow-lg transition duration-150 ease-in-out "
           >
             Sign out
           </button>
@@ -416,6 +291,8 @@ function App({ signOut, user }) {
   );
 }
 
+// Export the App component with AWS Amplify's withAuthenticator HOC for handling user authentication.
+// The formFields configuration here customizes the sign-up form.
 export default withAuthenticator(App, {
   formFields: {
     signUp: {

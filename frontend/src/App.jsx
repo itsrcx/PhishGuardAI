@@ -1,17 +1,16 @@
-import { useState, useRef } from 'react'; // Import useRef
+import { useState, useRef } from 'react';
 import axios from 'axios';
 import { Amplify } from 'aws-amplify';
 import { withAuthenticator } from '@aws-amplify/ui-react';
 import { fetchAuthSession } from 'aws-amplify/auth';
 import '@aws-amplify/ui-react/styles.css';
-// import DOMPurify from 'dompurify'; // You would install and import dompurify for frontend sanitization
 
 
 Amplify.configure({
   Auth: {
     Cognito: {
-      userPoolClientId: "61aksv3gle8jkhrrh19s9v8h6u",
-      userPoolId: "us-east-1_fs5K43MNt",
+      userPoolClientId: "7hiqujnsiluv8nm5c5ffmhtkl3",
+      userPoolId: "us-east-1_mfHD81IQE",
     },
   },
   API: {
@@ -238,7 +237,7 @@ function App({ signOut, user }) {
       <div className="bg-white p-8 rounded-lg shadow-md w-full max-w-xl mt-10">
         <h1 className="text-3xl font-bold mb-4 text-gray-800 text-center">PhishGuard AI</h1>
         <p className="text-gray-600 mb-6 text-center">
-          Welcome, <span className="font-semibold text-blue-700">{user?.username || user?.signInDetails?.loginId || 'User'}</span>!
+          Welcome, <span className="font-semibold text-blue-700">{user?.username || 'User'}</span>!
         </p>
 
         {/* Content Analysis Section */}
@@ -417,4 +416,16 @@ function App({ signOut, user }) {
   );
 }
 
-export default withAuthenticator(App, { formFields });
+export default withAuthenticator(App, {
+  formFields: {
+    signUp: {
+      email: {
+        order: 1,
+        label: 'Email',
+        placeholder: 'Enter your email',
+        type: 'email',
+        required: true,
+      },
+    },
+  },
+});

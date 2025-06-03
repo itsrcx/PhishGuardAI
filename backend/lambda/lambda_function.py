@@ -166,22 +166,6 @@ def subscribe_email_to_sns(email):
         logger.error(f"Error subscribing email {email} to SNS: {e}")
         raise
 
-def subscribe_sms_to_sns(phone_number):
-    """
-    Subscribes a phone number (for SMS) to the SNS topic.
-    Phone numbers should be in E.164 format (e.g., +12065550100).
-    """
-    try:
-        response = sns.subscribe(
-            TopicArn=SNS_TOPIC_ARN,
-            Protocol='sms',
-            Endpoint=phone_number
-        )
-        logger.info(f"SMS subscription initiated for: {phone_number}. Subscription ARN: {response['SubscriptionArn']}")
-        return {"message": f"SMS subscription initiated for {phone_number}."}
-    except Exception as e:
-        logger.error(f"Error subscribing SMS {phone_number} to SNS: {e}")
-        raise
 
 def lambda_handler(event, context):
     """
@@ -189,6 +173,18 @@ def lambda_handler(event, context):
     Routes requests based on the API Gateway path.
     """
     logger.info(f"Received event: {json.dumps(event)}")
+    
+    # Handle Cognito Post Confirmation trigger
+    if event.get('triggerSource') == "PostConfirmation_ConfirmSignUp":
+        logger.info("Cognito Post Confirmation trigger detected.")
+        email = event['request']['userAttributes'].get('email', '')
+
+        subscribe_email_to_sns(email)
+
+        logger.info(f"User {email} subscribed to SNS topic after confirmation.")
+
+        return event
+
 
     # Default headers for API Gateway responses, including CORS
     headers = {
@@ -226,7 +222,7 @@ def lambda_handler(event, context):
                 'headers': headers,
                 'body': json.dumps(result)
             }
-        
+
         # --- Handle URL Scanning for Email ---
         # Matches API Gateway path /scan/email
         elif path == '/scan/email' and http_method == 'POST':
@@ -272,26 +268,8 @@ def lambda_handler(event, context):
                     'headers': headers,
                     'body': json.dumps({"message": "Email is required for subscription."})
                 }
-            
-            response_message = subscribe_email_to_sns(email)
-            return {
-                'statusCode': 200,
-                'headers': headers,
-                'body': json.dumps(response_message)
-            }
 
-        # --- Handle SMS Subscription ---
-        # Matches API Gateway path /subscribe/sms
-        elif path == '/subscribe/sms' and http_method == 'POST':
-            phone_number = body.get('phoneNumber', '') # Use 'phoneNumber' as the key in the request body
-            if not phone_number:
-                return {
-                    'statusCode': 400,
-                    'headers': headers,
-                    'body': json.dumps({"message": "Phone number is required for SMS subscription."})
-                }
-            
-            response_message = subscribe_sms_to_sns(phone_number)
+            response_message = subscribe_email_to_sns(email)
             return {
                 'statusCode': 200,
                 'headers': headers,

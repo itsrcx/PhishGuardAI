@@ -1,6 +1,15 @@
 node_modules/
 package-lock.json
 
+# python venv
+.venv/
+# Python cache
+__pycache__/
+# Python bytecode
+*.py[cod]
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+
 # amplify
 .amplify
 amplify_outputs*

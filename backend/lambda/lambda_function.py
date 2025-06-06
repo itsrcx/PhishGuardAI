@@ -247,21 +247,21 @@ def lambda_handler(event, context):
 
         # --- Handle Email Subscription ---
         # Matches API Gateway path /subscribe/email
-        elif path == '/subscribe/email' and http_method == 'POST':
-            email = body.get('email', '')
-            if not email:
-                return {
-                    'statusCode': 400,
-                    'headers': headers,
-                    'body': json.dumps({"message": "Email is required for subscription."})
-                }
+        # elif path == '/subscribe/email' and http_method == 'POST':
+        #     email = body.get('email', '')
+        #     if not email:
+        #         return {
+        #             'statusCode': 400,
+        #             'headers': headers,
+        #             'body': json.dumps({"message": "Email is required for subscription."})
+        #         }
 
-            response_message = subscribe_email_to_sns(email)
-            return {
-                'statusCode': 200,
-                'headers': headers,
-                'body': json.dumps(response_message)
-            }
+        #     response_message = subscribe_email_to_sns(email)
+        #     return {
+        #         'statusCode': 200,
+        #         'headers': headers,
+        #         'body': json.dumps(response_message)
+        #     }
 
         # --- Handle unsupported paths/methods ---
         else:

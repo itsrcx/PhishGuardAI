@@ -172,7 +172,10 @@ function App({ signOut, user }) {
   return (
     <div className="min-h-screen flex flex-col items-center bg-gray-100 font-inter p-4">
       <div className="bg-white p-8 rounded-lg shadow-md w-full max-w-xl mt-10">
-        <h1 className="text-3xl font-bold mb-4 text-gray-800 text-center">PhishGuard AI</h1>
+        <h1 className="text-3xl font-bold mb-4 text-center flex items-center justify-center gap-2 text-[#007F91]">
+          <img src="/phisGuardAi.svg" alt="Logo" className="h-8 w-8" />
+          PhishGuard AI
+        </h1>
         <p className="text-gray-600 mb-6 text-center">
           Welcome, <span className="font-semibold text-blue-700">{user?.username || 'User'}</span>!
         </p>

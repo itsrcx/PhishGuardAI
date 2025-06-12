@@ -35,7 +35,7 @@
 ### Prerequisites
 
 - Node.js and npm
-- AWS account with DynamoDB, SNS, Lambda, API Gateway, and Cognito set up
+- AWS account
 - Amplify CLI (optional, for deployment)
 
 ### Backend Deployment
@@ -45,6 +45,8 @@
 
 2. **Upload Lambda to S3:**
    - Upload `lambda_function.zip` to an S3 bucket in your AWS account.
+   > **Important:**  
+   > The Lambda function and the S3 bucket **must be in the same AWS region** for successful deployment.
 
 3. **Deploy AWS Resources:**
    - Use the provided `resource.yml` CloudFormation template to deploy all backend resources (DynamoDB, SNS, Lambda, API Gateway, Cognito).
@@ -62,8 +64,6 @@
      - `CodeBucket`: S3 bucket name where Lambda code is stored
      - `CodeObjectKey`: S3 key (object path) to the Lambda zip file
 
-   > **Important:**  
-   > The Lambda function and the S3 bucket **must be in the same AWS region** for successful deployment.
    - After deployment, note the output values for:
      - API Gateway URL
      - Cognito User Pool ID
@@ -106,7 +106,7 @@
 
 ### Usage
 
-1. Enter a URL in the input field.
+1. Enter URLs or emails in the input field.
 2. Click "Scan".
 3. View the risk assessment and details.
 

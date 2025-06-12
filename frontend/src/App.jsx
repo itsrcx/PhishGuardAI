@@ -9,15 +9,15 @@ import '@aws-amplify/ui-react/styles.css';
 Amplify.configure({
   Auth: {
     Cognito: {
-      userPoolClientId: "7hiqujnsiluv8nm5c5ffmhtkl3",
-      userPoolId: "us-east-1_mfHD81IQE",
+      userPoolId: import.meta.env.VITE_COGNITO_USER_POOL_ID,
+      userPoolClientId: import.meta.env.VITE_COGNITO_USER_POOL_CLIENT_ID
     },
   },
   API: {
     REST: {
       PhisGuardApis: {
-        endpoint: 'https://429qv9l0ib.execute-api.us-east-1.amazonaws.com/api',
-        region: 'us-east-1',
+        endpoint: import.meta.env.VITE_APIGATEWAY_BASE_URL,
+        region: import.meta.env.VITE_APIGATEWAY_REGION,
         authorizationType: 'AMAZON_COGNITO_USER_POOLS'
       }
     }
@@ -72,8 +72,9 @@ function App({ signOut, user }) {
     }
 
     try {
+      const api_path = `${API_BASE_URL}${path}`
       const res = await axios.post(
-        `${API_BASE_URL}${path}`,
+        api_path,
         data,
         {
           headers: {

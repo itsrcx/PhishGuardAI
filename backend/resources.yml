@@ -26,34 +26,6 @@ Resources:
     Type: AWS::SNS::Topic
     Properties:
       TopicName: !Sub "${ProjectName}-PhishGuardAlerts"
-AWSTemplateFormatVersion: '2010-09-09'
-Description: CloudFormation template for PhishGuardAI - Cognito, Lambda, API Gateway, SNS, DynamoDB
-
-Parameters:
-  ProjectName:
-    Type: String
-    Description: Name prefix for all resources (e.g., phishguardai)
-
-Resources:
-
-  # DynamoDB Table
-  PhishScanTable:
-    Type: AWS::DynamoDB::Table
-    Properties:
-      TableName: !Sub "${ProjectName}-PhishScans"
-      AttributeDefinitions:
-        - AttributeName: ScanID
-          AttributeType: S
-      KeySchema:
-        - AttributeName: ScanID
-          KeyType: HASH
-      BillingMode: PAY_PER_REQUEST
-
-  # SNS Topic
-  PhishGuardAlertsTopic:
-    Type: AWS::SNS::Topic
-    Properties:
-      TopicName: !Sub "${ProjectName}-PhishGuardAlerts"
 
   # Lambda Execution Role
   LambdaExecutionRole:
@@ -103,15 +75,15 @@ Resources:
       FunctionName: !Sub "${ProjectName}-Lambda"
       Handler: lambda_function.lambda_handler
       Role: !GetAtt LambdaExecutionRole.Arn
-      Runtime: python3.11
+      Runtime: python3.12
       Timeout: 30
       Environment:
         Variables:
           SNS_TOPIC_ARN: !Ref PhishGuardAlertsTopic
           PHISHSCAN_TABLE_NAME: !Ref PhishScanTable
       Code:
-        S3Bucket: "REPLACE_WITH_YOUR_DEPLOYMENT_BUCKET"
-        S3Key: "lambda/lambda_function.zip"
+        S3Bucket: "phishguardai-lambda"
+        S3Key: "lambda_function.zip"
 
   # Cognito User Pool with Post Confirmation Lambda Trigger
   UserPool:
@@ -168,14 +140,77 @@ Resources:
       ParentId: !Ref ApiGatewayResourceScan
       PathPart: email
       RestApiId: !Ref ApiGatewayRestApi
+    
+  # CORS support for /scan/url
+  ApiGatewayMethodScanUrlOptions:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref ApiGatewayRestApi
+      ResourceId: !Ref ApiGatewayResourceScanUrl
+      HttpMethod: OPTIONS
+      AuthorizationType: NONE
+      Integration:
+        Type: MOCK
+        RequestTemplates:
+          application/json: '{"statusCode": 200}'
+        IntegrationResponses:
+          - StatusCode: 200
+            ResponseParameters:
+              method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key'"
+              method.response.header.Access-Control-Allow-Methods: "'POST,OPTIONS'"
+              method.response.header.Access-Control-Allow-Origin: "'*'"
+      MethodResponses:
+        - StatusCode: 200
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Headers: true
+            method.response.header.Access-Control-Allow-Methods: true
+            method.response.header.Access-Control-Allow-Origin: true
 
+  # CORS support for /scan/email
+  ApiGatewayMethodScanEmailOptions:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref ApiGatewayRestApi
+      ResourceId: !Ref ApiGatewayResourceScanEmail
+      HttpMethod: OPTIONS
+      AuthorizationType: NONE
+      Integration:
+        Type: MOCK
+        RequestTemplates:
+          application/json: '{"statusCode": 200}'
+        IntegrationResponses:
+          - StatusCode: 200
+            ResponseParameters:
+              method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key'"
+              method.response.header.Access-Control-Allow-Methods: "'POST,OPTIONS'"
+              method.response.header.Access-Control-Allow-Origin: "'*'"
+      MethodResponses:
+        - StatusCode: 200
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Headers: true
+            method.response.header.Access-Control-Allow-Methods: true
+            method.response.header.Access-Control-Allow-Origin: true
+  
+  # API Gateway Authorizer for Cognito User Pool
+  ApiGatewayCognitoAuthorizer:
+    Type: AWS::ApiGateway::Authorizer
+    Properties:
+      Name: !Sub "${ProjectName}-CognitoAuthorizer"
+      Type: COGNITO_USER_POOLS
+      IdentitySource: method.request.header.Authorization
+      RestApiId: !Ref ApiGatewayRestApi
+      ProviderARNs:
+        - !GetAtt UserPool.Arn
+
+  # API Gateway Methods
   ApiGatewayMethodScanUrlPost:
     Type: AWS::ApiGateway::Method
     Properties:
       RestApiId: !Ref ApiGatewayRestApi
       ResourceId: !Ref ApiGatewayResourceScanUrl
       HttpMethod: POST
-      AuthorizationType: NONE
+      AuthorizationType: COGNITO_USER_POOLS
+      AuthorizerId: !Ref ApiGatewayCognitoAuthorizer
       Integration:
         Type: AWS_PROXY
         IntegrationHttpMethod: POST
@@ -189,13 +224,26 @@ Resources:
       RestApiId: !Ref ApiGatewayRestApi
       ResourceId: !Ref ApiGatewayResourceScanEmail
       HttpMethod: POST
-      AuthorizationType: NONE
+      AuthorizationType: COGNITO_USER_POOLS
+      AuthorizerId: !Ref ApiGatewayCognitoAuthorizer
       Integration:
         Type: AWS_PROXY
         IntegrationHttpMethod: POST
         Uri: !Sub
           - arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${LambdaArn}/invocations
           - { LambdaArn: !GetAtt PhishGuardLambda.Arn }
+
+  # API Gateway Deployment
+  ApiGatewayDeployment:
+    Type: AWS::ApiGateway::Deployment
+    DependsOn:
+      - ApiGatewayMethodScanUrlPost
+      - ApiGatewayMethodScanEmailPost
+      - ApiGatewayMethodScanUrlOptions
+      - ApiGatewayMethodScanEmailOptions
+    Properties:
+      RestApiId: !Ref ApiGatewayRestApi
+      StageName: api
 
   # Lambda Permission for API Gateway
   LambdaApiGatewayInvokePermission:
@@ -209,174 +257,7 @@ Resources:
 Outputs:
   ApiUrl:
     Description: "API Gateway endpoint"
-    Value: !Sub "https://${ApiGatewayRestApi}.execute-api.${AWS::Region}.amazonaws.com/prod"
-  UserPoolId:
-    Description: "Cognito User Pool ID"
-    Value: !Ref UserPool
-  UserPoolClientId:
-    Description: "Cognito User Pool Client ID"
-    Value: !Ref UserPoolClient
-  DynamoDBTable:
-    Description: "DynamoDB Table Name"
-    Value: !Ref PhishScanTable
-  SnsTopicArn:
-    Description: "SNS Topic ARN"
-    Value: !Ref PhishGuardAlertsTopic
-  # Lambda Execution Role
-  LambdaExecutionRole:
-    Type: AWS::IAM::Role
-    Properties:
-      RoleName: !Sub "${ProjectName}-LambdaRole"
-      AssumeRolePolicyDocument:
-        Version: "2012-10-17"
-        Statement:
-          - Effect: Allow
-            Principal:
-              Service: lambda.amazonaws.com
-            Action: sts:AssumeRole
-      Policies:
-        - PolicyName: !Sub "${ProjectName}-LambdaPolicy"
-          PolicyDocument:
-            Version: "2012-10-17"
-            Statement:
-              - Effect: Allow
-                Action:
-                  - dynamodb:PutItem
-                  - dynamodb:GetItem
-                  - dynamodb:UpdateItem
-                  - dynamodb:Scan
-                Resource: !GetAtt PhishScanTable.Arn
-              - Effect: Allow
-                Action:
-                  - sns:Publish
-                  - sns:Subscribe
-                Resource: !Ref PhishGuardAlertsTopic
-              - Effect: Allow
-                Action:
-                  - logs:CreateLogGroup
-                  - logs:CreateLogStream
-                  - logs:PutLogEvents
-                Resource: "arn:aws:logs:*:*:*"
-              - Effect: Allow
-                Action:
-                  - cognito-idp:AdminAddUserToGroup
-                  - cognito-idp:ListUsers
-                Resource: "*"
-
-  # Lambda Function
-  PhishGuardLambda:
-    Type: AWS::Lambda::Function
-    Properties:
-      FunctionName: !Sub "${ProjectName}-Lambda"
-      Handler: lambda_function.lambda_handler
-      Role: !GetAtt LambdaExecutionRole.Arn
-      Runtime: python3.11
-      Timeout: 30
-      Environment:
-        Variables:
-          SNS_TOPIC_ARN: !Ref PhishGuardAlertsTopic
-          PHISHSCAN_TABLE_NAME: !Ref PhishScanTable
-      Code:
-        S3Bucket: "REPLACE_WITH_YOUR_DEPLOYMENT_BUCKET"
-        S3Key: "lambda/lambda_function.zip"
-
-  # Cognito User Pool with Post Confirmation Lambda Trigger
-  UserPool:
-    Type: AWS::Cognito::UserPool
-    Properties:
-      UserPoolName: !Sub "${ProjectName}-UserPool"
-      AutoVerifiedAttributes:
-        - email
-      LambdaConfig:
-        PostConfirmation: !GetAtt PhishGuardLambda.Arn
-
-  # Cognito User Pool Client
-  UserPoolClient:
-    Type: AWS::Cognito::UserPoolClient
-    Properties:
-      ClientName: !Sub "${ProjectName}-UserPoolClient"
-      UserPoolId: !Ref UserPool
-      GenerateSecret: false
-
-  # Lambda Permission for Cognito Trigger
-  CognitoLambdaPermission:
-    Type: AWS::Lambda::Permission
-    Properties:
-      FunctionName: !Ref PhishGuardLambda
-      Action: lambda:InvokeFunction
-      Principal: cognito-idp.amazonaws.com
-      SourceArn: !GetAtt UserPool.Arn
-
-  # API Gateway REST API
-  ApiGatewayRestApi:
-    Type: AWS::ApiGateway::RestApi
-    Properties:
-      Name: !Sub "${ProjectName}-Api"
-      EndpointConfiguration:
-        Types: [REGIONAL]
-
-  ApiGatewayResourceScan:
-    Type: AWS::ApiGateway::Resource
-    Properties:
-      ParentId: !GetAtt ApiGatewayRestApi.RootResourceId
-      PathPart: scan
-      RestApiId: !Ref ApiGatewayRestApi
-
-  ApiGatewayResourceScanUrl:
-    Type: AWS::ApiGateway::Resource
-    Properties:
-      ParentId: !Ref ApiGatewayResourceScan
-      PathPart: url
-      RestApiId: !Ref ApiGatewayRestApi
-
-  ApiGatewayResourceScanEmail:
-    Type: AWS::ApiGateway::Resource
-    Properties:
-      ParentId: !Ref ApiGatewayResourceScan
-      PathPart: email
-      RestApiId: !Ref ApiGatewayRestApi
-
-  ApiGatewayMethodScanUrlPost:
-    Type: AWS::ApiGateway::Method
-    Properties:
-      RestApiId: !Ref ApiGatewayRestApi
-      ResourceId: !Ref ApiGatewayResourceScanUrl
-      HttpMethod: POST
-      AuthorizationType: NONE
-      Integration:
-        Type: AWS_PROXY
-        IntegrationHttpMethod: POST
-        Uri: !Sub
-          - arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${LambdaArn}/invocations
-          - { LambdaArn: !GetAtt PhishGuardLambda.Arn }
-
-  ApiGatewayMethodScanEmailPost:
-    Type: AWS::ApiGateway::Method
-    Properties:
-      RestApiId: !Ref ApiGatewayRestApi
-      ResourceId: !Ref ApiGatewayResourceScanEmail
-      HttpMethod: POST
-      AuthorizationType: NONE
-      Integration:
-        Type: AWS_PROXY
-        IntegrationHttpMethod: POST
-        Uri: !Sub
-          - arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${LambdaArn}/invocations
-          - { LambdaArn: !GetAtt PhishGuardLambda.Arn }
-
-  # Lambda Permission for API Gateway
-  LambdaApiGatewayInvokePermission:
-    Type: AWS::Lambda::Permission
-    Properties:
-      FunctionName: !Ref PhishGuardLambda
-      Action: lambda:InvokeFunction
-      Principal: apigateway.amazonaws.com
-      SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:*/*/*"
-
-Outputs:
-  ApiUrl:
-    Description: "API Gateway endpoint"
-    Value: !Sub "https://${ApiGatewayRestApi}.execute-api.${AWS::Region}.amazonaws.com/prod"
+    Value: !Sub "https://${ApiGatewayRestApi}.execute-api.${AWS::Region}.amazonaws.com/api"
   UserPoolId:
     Description: "Cognito User Pool ID"
     Value: !Ref UserPool

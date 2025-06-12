@@ -100,16 +100,32 @@ function App({ signOut, user }) {
 
   // Function to add URL to the list
   const handleAddUrl = () => {
-    if (!currentUrlInput.trim()) {
+    const trimmedUrl = currentUrlInput.trim();
+
+    if (!trimmedUrl) {
       setAnalysisError("URL cannot be empty.");
       return;
     }
-    // Basic URL validation (starts with http or https)
-    if (!/^https?:\/\/.+/i.test(currentUrlInput.trim())) {
-        setAnalysisError("Please enter a valid URL (e.g., http://example.com or https://example.com).");
-        return;
+
+    // Disallow comma-separated URLs
+    if (trimmedUrl.includes(',')) {
+      setAnalysisError("Please enter only one URL at a time (no commas).");
+      return;
     }
-    setUrlsToScan([...urlsToScan, currentUrlInput.trim()]);
+
+    // Disallow spaces
+    if (trimmedUrl.includes(' ')) {
+      setAnalysisError("URL should not contain spaces.");
+      return;
+    }
+
+    // Basic URL validation (starts with http or https)
+    if (!/^https?:\/\/.+/i.test(trimmedUrl)) {
+      setAnalysisError("Please enter a valid URL (e.g., http://example.com or https://example.com).");
+      return;
+    }
+
+    setUrlsToScan([...urlsToScan, trimmedUrl]);
     setCurrentUrlInput(''); // Clear input field
     setAnalysisError(null); // Clear any previous error
   };

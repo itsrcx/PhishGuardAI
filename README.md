@@ -35,7 +35,7 @@
 ### Prerequisites
 
 - Node.js and npm
-- AWS account
+- AWS account and AWS CLI
 - Amplify CLI (optional, for deployment)
 
 ### Backend Deployment

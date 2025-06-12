@@ -5,6 +5,14 @@ Parameters:
   ProjectName:
     Type: String
     Description: Name prefix for all resources (e.g., phishguardai)
+  
+  CodeBucket:
+    Type: String
+    Description: S3 bucket name where Lambda code is stored
+
+  CodeObjectKey:
+    Type: String
+    Description: S3 key (object path) to the Lambda zip file
 
 Resources:
 
@@ -82,8 +90,8 @@ Resources:
           SNS_TOPIC_ARN: !Ref PhishGuardAlertsTopic
           PHISHSCAN_TABLE_NAME: !Ref PhishScanTable
       Code:
-        S3Bucket: "phishguardai-lambda"
-        S3Key: "lambda_function.zip"
+        S3Bucket: !Ref CodeBucket
+        S3Key: !Ref CodeObjectKey
 
   # Cognito User Pool with Post Confirmation Lambda Trigger
   UserPool:

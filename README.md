@@ -35,43 +35,76 @@
 ### Prerequisites
 
 - Node.js and npm
-- AWS account with DynamoDB and SNS set up
+- AWS account with DynamoDB, SNS, Lambda, API Gateway, and Cognito set up
 - Amplify CLI (optional, for deployment)
+
+### Backend Deployment
+
+1. **Package Lambda:**
+   - Zip your Lambda code (`lambda_function.py` and dependencies) as `lambda_function.zip`.
+
+2. **Upload Lambda to S3:**
+   - Upload `lambda_function.zip` to an S3 bucket in your AWS account.
+
+3. **Deploy AWS Resources:**
+   - Use the provided `resource.yml` CloudFormation template to deploy all backend resources (DynamoDB, SNS, Lambda, API Gateway, Cognito).
+   - Pass your project name and the S3 bucket/key for the Lambda zip as parameters.
+   - Example command:
+     ```sh
+     aws cloudformation deploy \
+       --template-file resource.yml \
+       --stack-name <your-stack-name> \
+       --parameter-overrides ProjectName=<your-project-name> CodeBucket=<your-s3-bucket> CodeObjectKey=<your-lambda-zip-path> \
+       --capabilities CAPABILITY_NAMED_IAM
+     ```
+   - **Parameters:**
+     - `ProjectName`: Name prefix for all resources (e.g., phishguardai)
+     - `CodeBucket`: S3 bucket name where Lambda code is stored
+     - `CodeObjectKey`: S3 key (object path) to the Lambda zip file
+
+   > **Important:**  
+   > The Lambda function and the S3 bucket **must be in the same AWS region** for successful deployment.
+   - After deployment, note the output values for:
+     - API Gateway URL
+     - Cognito User Pool ID
+     - Cognito User Pool Client ID
+     - Region
 
 ### Frontend
 
-1. Install dependencies:
+1. **Set Environment Variables:**
+   - Before deploying with Amplify or running locally, set the following environment variables:
+     - `VITE_APIGATEWAY_BASE_URL` (API Gateway endpoint from CloudFormation output)
+     - `VITE_APIGATEWAY_REGION` (AWS region)
+     - `VITE_COGNITO_USER_POOL_CLIENT_ID` (from CloudFormation output)
+     - `VITE_COGNITO_USER_POOL_ID` (from CloudFormation output)
 
+   - **For Amplify deployment:**  
+     Add these variables in the Amplify Console under "Environment variables" before deploying.
+
+   - **For local development:**  
+     Create a `.env` file in the `frontend` directory:
+     ```
+     VITE_APIGATEWAY_BASE_URL=...
+     VITE_APIGATEWAY_REGION=...
+     VITE_COGNITO_USER_POOL_CLIENT_ID=...
+     VITE_COGNITO_USER_POOL_ID=...
+     ```
+
+2. **Install dependencies:**
     ```sh
     cd frontend
     npm install
     ```
 
-2. Start the development server:
-
+3. **Start the development server:**
     ```sh
     npm run dev
     ```
 
-3. Open [http://localhost:5173](http://localhost:5173) to use the app.
+4. **Open [http://localhost:5173](http://localhost:5173) to use the app.**
 
-### Backend (Custom creation on aws console for now ... Automation InProgress!)
-
-- The backend is an AWS Lambda function ([`backend/lambda_function.py`](backend/lambda_function.py)) that:
-  - Receives POST requests with a URL.
-  - Checks for phishing indicators.
-  - Stores results in DynamoDB (`PhishScans` table).
-  - Sends SNS alerts for high-risk URLs.
-
-#### Environment Variables
-
-- `SNS_TOPIC_ARN`: ARN of the SNS topic for alerts.
-
-### Deployment
-
-- The project uses Amplify for CI/CD. See [`frontend/amplify_yml/buildspec.yml`](frontend/amplify_yml/buildspec.yml) for build steps.
-
-## Usage
+### Usage
 
 1. Enter a URL in the input field.
 2. Click "Scan".

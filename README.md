@@ -3,7 +3,7 @@
 *Empower Your Safety, Outsmart Phishing Threats Today*
 
 ![last commit](https://img.shields.io/badge/last%20commit-today-2ea44f)
-![notebook](https://img.shields.io/badge/jupyter%20notebook-54.3%25-blue)
+<!-- ![notebook](https://img.shields.io/badge/jupyter%20notebook-54.3%25-blue) -->
 ![languages](https://img.shields.io/badge/languages-4-blue)
 
 ---

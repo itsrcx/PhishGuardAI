@@ -49,7 +49,7 @@
    > The Lambda function and the S3 bucket **must be in the same AWS region** for successful deployment.
 
 3. **Deploy AWS Resources:**
-   - Use the provided `resource.yml` CloudFormation template to deploy all backend resources (DynamoDB, SNS, Lambda, API Gateway, Cognito).
+   - Use the provided `resource.yml` (inside backend dir) CloudFormation template to deploy all backend resources (DynamoDB, SNS, Lambda, API Gateway, Cognito).
    - Pass your project name and the S3 bucket/key for the Lambda zip as parameters.
    - Example command:
      ```sh
@@ -79,7 +79,9 @@
      - `VITE_COGNITO_USER_POOL_CLIENT_ID` (from CloudFormation output)
      - `VITE_COGNITO_USER_POOL_ID` (from CloudFormation output)
 
+
    - **For Amplify deployment:**  
+     In `Frontend build command` and `Build output directory` upload `buildspec.yml` from frontend/amplify dir.
      Add these variables in the Amplify Console under "Environment variables" before deploying.
 
    - **For local development:**  

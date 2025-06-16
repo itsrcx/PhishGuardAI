@@ -27,15 +27,14 @@ Amplify.configure({
 // API Name constant
 const MY_API_NAME = 'PhisGuardApis';
 
-
 function App({ signOut, user }) {
   // State for URL input and list of URLs
   const [currentUrlInput, setCurrentUrlInput] = useState('');
   const [urlsToScan, setUrlsToScan] = useState([]);
 
-  // State for Email input (stores HTML content from contenteditable div)
+  // State for Email input
   const [emailText, setEmailText] = useState('');
-  const emailTextInputRef = useRef(null); // Ref to access the contenteditable div
+  const emailInputRef = useRef(null);
 
   // State for analysis results, errors, and loading
   const [analysisResults, setAnalysisResults] = useState([]);
@@ -49,14 +48,12 @@ function App({ signOut, user }) {
   const getAuthToken = async () => {
     try {
       const session = await fetchAuthSession();
-      // Ensure tokens exist and idToken is present
       if (session.tokens && session.tokens.idToken) {
         return session.tokens.idToken.toString();
       }
       throw new Error("ID token not found in session.");
     } catch (error) {
       console.error("Error fetching auth session:", error);
-      // It's good practice to inform the user or handle this more gracefully
       setAnalysisError("Failed to retrieve authentication session. Please try signing out and in again.");
       throw new Error("Failed to retrieve authentication session.");
     }
@@ -72,7 +69,7 @@ function App({ signOut, user }) {
     }
 
     try {
-      const api_path = `${API_BASE_URL}${path}`
+      const api_path = `${API_BASE_URL}${path}`;
       const res = await axios.post(
         api_path,
         data,
@@ -83,20 +80,43 @@ function App({ signOut, user }) {
           },
         }
       );
-      return res.data; // Return response data
+      return res.data;
     } catch (err) {
       console.error("API call error details:", err);
       if (err.response) {
-        // Handle API errors (e.g., 4xx, 5xx)
         throw new Error(`Error ${err.response.status}: ${err.response.data?.message || err.response.statusText || 'Unknown API error'}`);
       } else if (err.request) {
-        // Handle network errors (request made but no response)
         throw new Error("Network error: No response from API. Please check your connection.");
       } else {
-        // Handle other errors
         throw new Error(`An unexpected error occurred: ${err.message}`);
       }
     }
+  };
+
+  // Helper function to extract URLs from HTML content
+  const extractUrlsFromHtml = (htmlContent) => {
+    const tempDiv = document.createElement('div');
+    tempDiv.innerHTML = htmlContent;
+    
+    const urls = [];
+    
+    // Extract URLs from anchor tags
+    const links = tempDiv.querySelectorAll('a[href]');
+    links.forEach(link => {
+      const href = link.getAttribute('href');
+      if (href && (href.startsWith('http://') || href.startsWith('https://'))) {
+        urls.push(href);
+      }
+    });
+    
+    // Also extract plain text URLs using regex
+    const textContent = tempDiv.textContent || tempDiv.innerText || '';
+    const urlRegex = /https?:\/\/[^\s<>"{}|\\^`[\]]+/gi;
+    const textUrls = textContent.match(urlRegex) || [];
+    urls.push(...textUrls);
+    
+    // Remove duplicates and return
+    return [...new Set(urls)];
   };
 
   // Function to add URL to the list
@@ -127,8 +147,8 @@ function App({ signOut, user }) {
     }
 
     setUrlsToScan([...urlsToScan, trimmedUrl]);
-    setCurrentUrlInput(''); // Clear input field
-    setAnalysisError(null); // Clear any previous error
+    setCurrentUrlInput('');
+    setAnalysisError(null);
   };
 
   // Function to remove URL from the list
@@ -136,52 +156,79 @@ function App({ signOut, user }) {
     setUrlsToScan(urlsToScan.filter((_, index) => index !== indexToRemove));
   };
 
-  // Function to handle scanning URLs and Email Text
-  const handleAnalyzeContent = async () => {
-    // Frontend sanitization could be done here if needed using a library like DOMPurify
-    // const sanitizedEmailText = DOMPurify.sanitize(emailText.trim());
+  // Function to extract URLs from email and add to URL list
+  const handleExtractUrlsFromEmail = () => {
+    if (!emailText.trim()) {
+      setAnalysisError("Please enter email content first.");
+      return;
+    }
 
-    if (urlsToScan.length === 0 && !emailText.trim()) {
-      setAnalysisError("Please add at least one URL or enter email text to analyze.");
-      setAnalysisResults([]); // Clear any previous results
+    // Get the HTML content from the contentEditable div
+    const htmlContent = emailInputRef.current ? emailInputRef.current.innerHTML : emailText;
+    const extractedUrls = extractUrlsFromHtml(htmlContent);
+    
+    if (extractedUrls.length === 0) {
+      setAnalysisError("No URLs found in the email content.");
+      return;
+    }
+
+    // Add extracted URLs to the existing URL list (avoiding duplicates)
+    const allUrls = [...urlsToScan, ...extractedUrls];
+    const uniqueUrls = [...new Set(allUrls)];
+    
+    setUrlsToScan(uniqueUrls);
+    setAnalysisError(null);
+    
+    // Clear the email input after extraction
+    setEmailText('');
+    if (emailInputRef.current) {
+      emailInputRef.current.innerHTML = '';
+    }
+    
+    // Show success message
+    const newUrlsCount = uniqueUrls.length - urlsToScan.length;
+    if (newUrlsCount > 0) {
+      console.log(`Extracted ${newUrlsCount} URLs from email content`);
+    }
+  };
+
+  // Function to handle scanning all URLs
+  const handleAnalyzeContent = async () => {
+    if (urlsToScan.length === 0) {
+      setAnalysisError("Please add at least one URL to analyze.");
+      setAnalysisResults([]);
       return;
     }
 
     setIsAnalyzing(true);
     setAnalysisError(null);
-    setAnalysisResults([]); // Clear previous results before new analysis
-    const newResults = [];
+    setAnalysisResults([]);
 
-    // Analyze URLs
-    if (urlsToScan.length > 0) {
-        for (let i = 0; i < urlsToScan.length; i++) {
-          const url = urlsToScan[i];
-          try {
-            const data = await makeApiCall('/scan/url', { url });
-            newResults.push({ id: `url-${i}-${Date.now()}`, type: 'URL', input: url, status: 'success', data });
-          } catch (err) {
-            newResults.push({ id: `url-${i}-${Date.now()}`, type: 'URL', input: url, status: 'error', error: err.message });
-          }
-        }
+    try {
+      // Single API call with all URLs
+      const data = await makeApiCall('/scan/urls', { urls: urlsToScan });
+      setAnalysisResults([{ 
+        id: `urls-${Date.now()}`, 
+        type: 'URLs', 
+        status: 'success', 
+        data,
+        urlCount: urlsToScan.length 
+      }]);
+    } catch (err) {
+      setAnalysisResults([{ 
+        id: `urls-${Date.now()}`, 
+        type: 'URLs', 
+        status: 'error', 
+        error: err.message,
+        urlCount: urlsToScan.length 
+      }]);
     }
 
-    // Analyze Email Text (HTML content)
-    if (emailText.trim()) {
-      try {
-        // Send the HTML emailText to the backend
-        // The backend needs to be capable of parsing HTML and extracting links for analysis
-        const data = await makeApiCall('/scan/email', { email: emailText.trim() /* or sanitizedEmailText */ });
-        newResults.push({ id: `email-1-${Date.now()}`, type: 'Email', status: 'success', data });
-      } catch (err) {
-        newResults.push({ id: `email-1-${Date.now()}`, type: 'Email', status: 'error', error: err.message });
-      }
-    }
-
-    setAnalysisResults(newResults);
-    setUrlsToScan([]); // Clear scanned URLs
-    setEmailText('');   // Clear email text
-    if (emailTextInputRef.current) {
-        emailTextInputRef.current.innerHTML = ''; // Clear contenteditable div directly
+    // Clear inputs after analysis
+    setUrlsToScan([]);
+    setEmailText('');
+    if (emailInputRef.current) {
+      emailInputRef.current.innerHTML = '';
     }
     setIsAnalyzing(false);
   };
@@ -200,6 +247,65 @@ function App({ signOut, user }) {
         {/* Content Analysis Section */}
         <div className="mb-8 p-4 border border-gray-200 rounded-md bg-gray-50">
           <h2 className="text-xl font-semibold mb-3 text-gray-800">Analyze Content</h2>
+
+          {/* Email Text Input Section */}
+          <div className="mb-4">
+  <label htmlFor="emailTextInput" className="block text-gray-700 text-sm font-bold mb-1">
+    Email Content (paste HTML content to extract URLs):
+  </label>
+  <div
+    ref={emailInputRef}
+    contentEditable="true"
+    onInput={e => setEmailText(e.currentTarget.innerHTML)} // use innerHTML to keep links
+    onPaste={e => {
+      e.preventDefault();
+      const clipboardData = e.clipboardData || window.clipboardData;
+      const pastedHtml = clipboardData.getData('text/html');
+      const pastedText = clipboardData.getData('text/plain');
+
+      if (pastedHtml) {
+        document.execCommand('insertHTML', false, pastedHtml);
+        setTimeout(() => {
+          setEmailText(e.currentTarget.innerHTML);
+        }, 0);
+      } else {
+        // fallback for plain text with possible URLs
+        const urlRegex = /https?:\/\/[^\s]+/g;
+        const htmlWithLinks = pastedText.replace(urlRegex, url => `<a href="${url}" target="_blank">${url}</a>`);
+        document.execCommand('insertHTML', false, htmlWithLinks);
+        setTimeout(() => {
+          setEmailText(e.currentTarget.innerHTML);
+        }, 0);
+      }
+    }}
+    className="w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-800 min-h-[120px] overflow-y-auto"
+    style={{ whiteSpace: 'pre-wrap' }}
+    data-placeholder="Paste email content here (HTML with hyperlinks will be preserved)..."
+  />
+  <style jsx>{`
+    div[contenteditable]:empty:before {
+      content: attr(data-placeholder);
+      color: #9CA3AF;
+      pointer-events: none;
+    }
+    a {
+      color: #2563eb;
+      text-decoration: underline;
+    }
+  `}</style>
+
+  <button
+    onClick={handleExtractUrlsFromEmail}
+    disabled={!emailText.trim()}
+    className={`mt-2 py-2 px-4 rounded-md font-bold transition duration-300 ease-in-out ${
+      !emailText.trim()
+        ? 'bg-gray-300 cursor-not-allowed text-gray-500'
+        : 'bg-blue-500 hover:bg-blue-600 text-white shadow-sm'
+    }`}
+  >
+    Extract URLs from Email
+  </button>
+</div>
 
           {/* URL Input Section */}
           <div className="mb-4">
@@ -225,14 +331,14 @@ function App({ signOut, user }) {
             </div>
             {urlsToScan.length > 0 && (
               <div className="mt-2 space-y-1">
-                <p className="text-sm text-gray-600">URLs to scan:</p>
-                <ul className="list-disc list-inside pl-2 max-h-28 overflow-y-auto bg-gray-100 p-2 rounded-md">
+                <p className="text-sm text-gray-600">URLs to scan ({urlsToScan.length}):</p>
+                <ul className="list-disc list-inside pl-2 max-h-32 overflow-y-auto bg-gray-100 p-2 rounded-md">
                   {urlsToScan.map((url, index) => (
                     <li key={index} className="text-sm text-gray-700 flex justify-between items-center">
-                      <span>{url}</span>
+                      <span className="break-all">{url}</span>
                       <button
                         onClick={() => handleRemoveUrl(index)}
-                        className="text-red-500 hover:text-red-700 text-xs ml-2"
+                        className="text-red-500 hover:text-red-700 text-xs ml-2 flex-shrink-0"
                         title="Remove URL"
                       >
                         ✖
@@ -243,32 +349,15 @@ function App({ signOut, user }) {
               </div>
             )}
           </div>
-
-          {/* Email Text Input Section (now uses contenteditable div) */}
-          <div className="mb-4">
-            <label htmlFor="emailTextInputDiv" className="block text-gray-700 text-sm font-bold mb-1">Analyze Email Content (hyper link will be retained):</label>
-            <div
-              id="emailTextInputDiv"
-              ref={emailTextInputRef}
-              contentEditable="true"
-              onInput={e => setEmailText(e.currentTarget.innerHTML)}
-              // ONLY use dangerouslySetInnerHTML IF emailText has content
-              // Otherwise, we'll show the placeholder
-              {...(!emailText.trim() && { dangerouslySetInnerHTML: { __html: '<span class="text-gray-400">Paste the full email content here (HTML will be retained)...</span>' }})}
-              className="w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-800 min-h-[120px] overflow-y-auto"
-            >
-              {/* No direct children here */}
-            </div>
-          </div>
           
           <button
             onClick={handleAnalyzeContent}
-            disabled={isAnalyzing || (urlsToScan.length === 0 && !emailText.trim())}
+            disabled={isAnalyzing || urlsToScan.length === 0}
             className={`py-3 px-6 rounded-md font-bold transition duration-300 ease-in-out w-full ${
-              isAnalyzing || (urlsToScan.length === 0 && !emailText.trim()) ? 'bg-gray-400 cursor-not-allowed text-gray-600' : 'bg-green-600 hover:bg-green-700 text-white shadow-md'
+              isAnalyzing || urlsToScan.length === 0 ? 'bg-gray-400 cursor-not-allowed text-gray-600' : 'bg-green-600 hover:bg-green-700 text-white shadow-md'
             }`}
           >
-            {isAnalyzing ? 'Analyzing...' : 'Analyze Content'}
+            {isAnalyzing ? 'Analyzing...' : `Analyze ${urlsToScan.length} URL${urlsToScan.length !== 1 ? 's' : ''}`}
           </button>
 
           {analysisError && (
@@ -282,9 +371,10 @@ function App({ signOut, user }) {
               <h3 className="text-lg font-semibold text-gray-800">Analysis Results:</h3>
               {analysisResults.map((item) => (
                 <div key={item.id} className={`p-4 rounded-md border ${item.status === 'success' ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
-                  <h4 className="font-semibold text-gray-800">{item.type} Analysis: {item.input || 'Email Body'}</h4>
+                  <h4 className="font-semibold text-gray-800">
+                    {item.type} Analysis ({item.urlCount} URLs scanned)
+                  </h4>
                   {item.status === 'success' ? (
-                    // Display raw JSON for now, your backend should return structured data
                     <pre className="whitespace-pre-wrap break-words text-sm bg-gray-100 p-3 mt-2 rounded-md overflow-x-auto text-gray-700">
                       {JSON.stringify(item.data, null, 2)}
                     </pre>

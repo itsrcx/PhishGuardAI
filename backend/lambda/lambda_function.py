@@ -24,13 +24,19 @@ TABLE_NAME = os.getenv('PHISHSCAN_TABLE_NAME', 'PhishScans')
 # Initialize DynamoDB table resource
 table = dynamodb.Table(TABLE_NAME)
 
-def is_phishing_url(url):
+
+def is_phishing_url(url: str) -> bool:
     """
-    Placeholder phishing detection logic.
-    In a real application, this would involve a more sophisticated ML model or API call.
+    Enhanced phishing detection logic.
     """
-    # Simple check: if "login" or "secure" is in the URL, flag as high risk
-    return "login" in url.lower() or "secure" in url.lower()
+    phishing_indicators = [
+        "login", "secure", "account", "verify", 
+        "password", "banking", "paypal", "amazon",
+        "update", "security", "confirm", "click"
+    ]
+    url_lower = url.lower()
+    return any(indicator in url_lower for indicator in phishing_indicators)
+
 
 def extract_urls_from_email(email_text: str) -> List[str]:
     """
@@ -67,25 +73,19 @@ def extract_urls_from_email(email_text: str) -> List[str]:
 
     return normalized_urls
 
-def build_scan_result(urls, is_phishing, is_email=False):
+def build_scan_result(url, is_phishing):
     """
     Constructs a dictionary representing the URL scan result.
-    """
-    item_type_str = "Email" if is_email else "URL"
-    reason_message = ""
-        
+    """ 
     if is_phishing:
-        if is_email:
-            reason_message = "Email content flagged as phishing based on indicators."
-        else:
             reason_message = "URL flagged as phishing based on indicators."
     else:
-        reason_message = f"No common phishing indicators detected in the {item_type_str}."
+        reason_message = f"No common phishing indicators detected during scan."
 
-    logger.info(f"Scan result for {item_type_str}: {urls} - Risk Level: {'HIGH' if is_phishing else 'LOW'}")
+    logger.info(f"Scan result for {url} - Risk Level: {'HIGH' if is_phishing else 'LOW'}")
     return {
         "ScanID": str(uuid.uuid4()),
-        "URL": urls,
+        "URL": url,
         "RiskLevel": "HIGH" if is_phishing else "LOW",
         "Timestamp": datetime.now(tz=timezone.utc).isoformat(),
         "Details": {
@@ -105,21 +105,21 @@ def save_to_dynamodb(item):
         logger.error(f"Error saving to DynamoDB: {e}")
         raise # Re-raise the exception to indicate failure
 
-def send_sns_alert(url):
+def send_sns_alert(high_risk_results):
     """
     Publishes a phishing alert message to the configured SNS topic.
     The message is structured for different protocols (default, SMS, email).
     """
+    url_list = "\n".join(f"🔗 {r['URL']}" for r in high_risk_results)
+
     message = {
-        "default": f"⚠️ Phishing alert: {url}",
-        "sms": f"⚠️ Phishing alert: {url}",
+        "default": f"⚠️ Phishing alert detected! {len(high_risk_results)} high-risk URLs found. Check email for details.",
+        "sms": f"⚠️ ⚠️ {len(high_risk_results)} high-risk phishing URLs detected. Check email for details.",
         "email": f"""
-⚠️ PhishGuard Alert ⚠️
+🚨 The following high-risk phishing URLs were detected:
+{url_list}
 
-A suspicious URL has been detected:
-🔗 {url}
-
-Please take immediate action to verify and block if necessary.
+Please investigate and take necessary actions.
 
 🛡️ PhishGuard AI Security System 🛡️
 """
@@ -129,9 +129,9 @@ Please take immediate action to verify and block if necessary.
             TopicArn=SNS_TOPIC_ARN,
             Message=json.dumps(message),
             MessageStructure='json', # Required when sending different messages for different protocols
-            Subject="⚠️ PhishGuard Alert" # Subject for email notifications
+            Subject="⚠️ PhishGuard Alert ⚠️" # Subject for email notifications
         )
-        logger.info(f"SNS alert sent for URL: {url}")
+        logger.info(f"SNS alert sent for URL: {url_list}")
     except Exception as e:
         logger.error(f"Error sending SNS alert: {e}")
         raise # Re-raise the exception
@@ -187,88 +187,34 @@ def lambda_handler(event, context):
         http_method = event.get('httpMethod', '')
 
         # --- Handle URL Scanning ---
-        # Matches API Gateway path /scan
-        if path == '/scan/url' and http_method == 'POST':
-            url = body.get('url', '')
-            if not url:
+        if path == '/scan/urls' and http_method == 'POST':
+            urls = body.get('urls', [])
+            if not urls:
                 return {
                     'statusCode': 400,
                     'headers': headers,
                     'body': json.dumps({"message": "URL is required for scanning."})
                 }
+            
+            scan_results = []
+            high_risk_urls = []
 
-            is_phish = is_phishing_url(url)
-            result = build_scan_result(url, is_phish)
-            save_to_dynamodb(result)
+            for url in urls:
+                is_phish = is_phishing_url(url)
+                result = build_scan_result(url, is_phish)
+                save_to_dynamodb(result)
+                scan_results.append(result)
 
-            if result["RiskLevel"] == "HIGH":
-                send_sns_alert(url)
+                if result["RiskLevel"] == "HIGH":
+                    high_risk_urls.append(result)
+
+            if high_risk_urls:
+                send_sns_alert(high_risk_urls)
 
             return {
                 'statusCode': 200,
                 'headers': headers,
-                'body': json.dumps(result)
-            }
-
-        # --- Handle URL Scanning for Email ---
-        # Matches API Gateway path /scan/email
-        elif path == '/scan/email' and http_method == 'POST':
-            email_text = body.get('email', '')
-            if not email_text:
-                return {
-                    'statusCode': 400,
-                    'headers': headers,
-                    'body': json.dumps({"message": "Email is required for scanning."})
-                }
-
-            # Placeholder for email scanning logic
-            # In a real application, this would involve checking the email content or links
-            urls = extract_urls_from_email(email_text)
-            if not urls:
-                return {
-                    'statusCode': 400,
-                    'headers': headers,
-                    'body': json.dumps({"message": "No URLs found in the email content."})
-                }
-            is_phish = any(is_phishing_url(url) for url in urls)
-
-            urls = (",").join(urls)  # Join URLs into a single string for the result
-
-            result = build_scan_result(urls, is_phish, is_email=True)
-            is_phish = result["Details"]["is_phishing"]
-            save_to_dynamodb(result)
-            if result["RiskLevel"] == "HIGH":
-                send_sns_alert(result.get("URL"))
-            return {
-                'statusCode': 200,
-                'headers': headers,
-                'body': json.dumps(result)
-            }
-
-        # --- Handle Email Subscription ---
-        # Matches API Gateway path /subscribe/email
-        # elif path == '/subscribe/email' and http_method == 'POST':
-        #     email = body.get('email', '')
-        #     if not email:
-        #         return {
-        #             'statusCode': 400,
-        #             'headers': headers,
-        #             'body': json.dumps({"message": "Email is required for subscription."})
-        #         }
-
-        #     response_message = subscribe_email_to_sns(email)
-        #     return {
-        #         'statusCode': 200,
-        #         'headers': headers,
-        #         'body': json.dumps(response_message)
-        #     }
-
-        # --- Handle unsupported paths/methods ---
-        else:
-            return {
-                'statusCode': 404,
-                'headers': headers,
-                'body': json.dumps({"message": "Not Found or Method Not Allowed"})
+                'body': json.dumps(scan_results)
             }
 
     except json.JSONDecodeError:

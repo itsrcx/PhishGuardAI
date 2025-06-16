@@ -139,16 +139,10 @@ Resources:
     Type: AWS::ApiGateway::Resource
     Properties:
       ParentId: !Ref ApiGatewayResourceScan
-      PathPart: url
+      PathPart: urls
       RestApiId: !Ref ApiGatewayRestApi
 
-  ApiGatewayResourceScanEmail:
-    Type: AWS::ApiGateway::Resource
-    Properties:
-      ParentId: !Ref ApiGatewayResourceScan
-      PathPart: email
-      RestApiId: !Ref ApiGatewayRestApi
-    
+
   # CORS support for /scan/url
   ApiGatewayMethodScanUrlOptions:
     Type: AWS::ApiGateway::Method
@@ -174,31 +168,6 @@ Resources:
             method.response.header.Access-Control-Allow-Methods: true
             method.response.header.Access-Control-Allow-Origin: true
 
-  # CORS support for /scan/email
-  ApiGatewayMethodScanEmailOptions:
-    Type: AWS::ApiGateway::Method
-    Properties:
-      RestApiId: !Ref ApiGatewayRestApi
-      ResourceId: !Ref ApiGatewayResourceScanEmail
-      HttpMethod: OPTIONS
-      AuthorizationType: NONE
-      Integration:
-        Type: MOCK
-        RequestTemplates:
-          application/json: '{"statusCode": 200}'
-        IntegrationResponses:
-          - StatusCode: 200
-            ResponseParameters:
-              method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key'"
-              method.response.header.Access-Control-Allow-Methods: "'POST,OPTIONS'"
-              method.response.header.Access-Control-Allow-Origin: "'*'"
-      MethodResponses:
-        - StatusCode: 200
-          ResponseParameters:
-            method.response.header.Access-Control-Allow-Headers: true
-            method.response.header.Access-Control-Allow-Methods: true
-            method.response.header.Access-Control-Allow-Origin: true
-  
   # API Gateway Authorizer for Cognito User Pool
   ApiGatewayCognitoAuthorizer:
     Type: AWS::ApiGateway::Authorizer
@@ -226,29 +195,12 @@ Resources:
           - arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${LambdaArn}/invocations
           - { LambdaArn: !GetAtt PhishGuardLambda.Arn }
 
-  ApiGatewayMethodScanEmailPost:
-    Type: AWS::ApiGateway::Method
-    Properties:
-      RestApiId: !Ref ApiGatewayRestApi
-      ResourceId: !Ref ApiGatewayResourceScanEmail
-      HttpMethod: POST
-      AuthorizationType: COGNITO_USER_POOLS
-      AuthorizerId: !Ref ApiGatewayCognitoAuthorizer
-      Integration:
-        Type: AWS_PROXY
-        IntegrationHttpMethod: POST
-        Uri: !Sub
-          - arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${LambdaArn}/invocations
-          - { LambdaArn: !GetAtt PhishGuardLambda.Arn }
-
   # API Gateway Deployment
   ApiGatewayDeployment:
     Type: AWS::ApiGateway::Deployment
     DependsOn:
       - ApiGatewayMethodScanUrlPost
-      - ApiGatewayMethodScanEmailPost
       - ApiGatewayMethodScanUrlOptions
-      - ApiGatewayMethodScanEmailOptions
     Properties:
       RestApiId: !Ref ApiGatewayRestApi
       StageName: api
